@@ -55,8 +55,7 @@ function SceneLoader() {
 }
 
 // ── Gesture Browser panel ─────────────────────────────────────────────────────
-function GestureBrowser({ selected, onSelect }) {
-  const [tab, setTab] = useState('words')
+function GestureBrowser({ selected, onSelect, tab, onTabChange }) {
   const cat = CATEGORIES[tab]
 
   return (
@@ -71,7 +70,7 @@ function GestureBrowser({ selected, onSelect }) {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4 }}>
         {Object.entries(CATEGORIES).map(([key, c]) => (
-          <button key={key} onClick={() => setTab(key)} style={{
+          <button key={key} onClick={() => onTabChange(key)} style={{
             flex: 1, padding: '5px 4px', borderRadius: 8, fontSize: '0.6rem',
             fontFamily: 'DM Sans, sans-serif', fontWeight: 600, cursor: 'pointer',
             background: tab === key ? `${c.color}18` : 'transparent',
@@ -113,6 +112,7 @@ export default function Avatar3DPage() {
   const [speed, setSpeed] = useState(1)
   const [livePrediction, setLivePrediction] = useState(null)
   const [mirrorMode, setMirrorMode] = useState(false)
+  const [browserTab, setBrowserTab] = useState('words')
 
   // Shared classifier for predictions (read-only)
   const classifier = useSharedClassifier()
@@ -138,12 +138,36 @@ export default function Avatar3DPage() {
     // useMediaPipe has its own cleanup effect that handles this correctly.
   }, [mode])
 
+  useEffect(() => {
+    if (mode !== 'live') {
+      classifier.setMode('word')
+      return
+    }
+    if (browserTab === 'letters') classifier.setMode('letter')
+    else if (browserTab === 'digits') classifier.setMode('number')
+    else classifier.setMode('word')
+  }, [mode, browserTab, classifier])
+
   // Pipe live landmarks → classifier → avatar
   useEffect(() => {
     if (mode !== 'live' || !mediapipe.handDetected || !mediapipe.landmarks) return
-    const result = classifier.predict?.(mediapipe.landmarks, mediapipe.rawLandmarks)
+    const result = classifier.predict?.(
+      mediapipe.landmarks,
+      mediapipe.rawLandmarks,
+      mediapipe.rawLandmarks2,
+      mediapipe.landmarks2,
+      mediapipe.getHolisticFrame?.() ?? null,
+    )
     if (result?.label) setLivePrediction(result)
-  }, [mediapipe.landmarks, mediapipe.handDetected, mode, classifier])
+  }, [
+    mediapipe.landmarks,
+    mediapipe.rawLandmarks,
+    mediapipe.rawLandmarks2,
+    mediapipe.landmarks2,
+    mediapipe.handDetected,
+    mode,
+    classifier,
+  ])
 
   // Active gesture: live prediction label OR manual browse selection
   const activeGesture = mode === 'live'
@@ -340,7 +364,12 @@ export default function Avatar3DPage() {
 
             {/* Browse panel */}
             {mode === 'browse' && (
-              <GestureBrowser selected={gesture} onSelect={setGesture} />
+              <GestureBrowser
+                selected={gesture}
+                onSelect={setGesture}
+                tab={browserTab}
+                onTabChange={setBrowserTab}
+              />
             )}
 
             {/* Live AI panel */}
@@ -353,6 +382,30 @@ export default function Avatar3DPage() {
                 <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.55rem', color: '#6b8ba4', letterSpacing: '0.12em' }}>
                   LIVE AI MODE
                 </span>
+
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {Object.entries(CATEGORIES).map(([key, c]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setBrowserTab(key)}
+                      style={{
+                        flex: 1,
+                        padding: '5px 4px',
+                        borderRadius: 8,
+                        fontSize: '0.6rem',
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        background: browserTab === key ? `${c.color}18` : 'transparent',
+                        border: `1px solid ${browserTab === key ? `${c.color}50` : '#1a2535'}`,
+                        color: browserTab === key ? c.color : '#6b8ba4',
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
 
                 {/* Camera status */}
                 <div style={{

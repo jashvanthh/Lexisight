@@ -78,10 +78,7 @@ class ErrorBoundary extends Component {
 }
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(() => {
-    // Only show splash once per session
-    return !sessionStorage.getItem('lxi_splash_shown')
-  })
+  const [showSplash, setShowSplash] = useState(true)
 
   useEffect(() => {
     if (!sessionStorage.getItem('lxi_session_counted')) {
@@ -93,7 +90,6 @@ export default function App() {
 
   const handleSplashFinished = () => {
     setShowSplash(false)
-    sessionStorage.setItem('lxi_splash_shown', 'true')
   }
 
   // FIX — ClassifierProvider inside BrowserRouter but OUTSIDE Suspense

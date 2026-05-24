@@ -1,3 +1,5 @@
+import { detectLetterB, detectLetterG } from './islTwoHandLetters.js'
+
 /**
  * LexiSight Finger Disambiguator v2
  * ════════════════════════════════════════════════════════════════
@@ -114,15 +116,13 @@ function rule_M_N(lm) {
  * Discriminant: which tip is closest to thumb.
  */
 function rule_O_6(lm) {
+  const pinkyOnly = P(lm) && !I(lm) && !Mi(lm) && !R(lm)
+  if (pinkyOnly) return { label: '6', confidence: 0.93 }
+
   const thumbTip = lm[4]
   const indexTip = lm[8]
-  const pinkyTip = lm[20]
-
   const dIndex = dist(indexTip, thumbTip)
-  const dPinky = dist(pinkyTip, thumbTip)
-
-  if (dIndex < 0.07 && dIndex < dPinky)  return { label: 'O', confidence: 0.88 }
-  if (dPinky < 0.09 && dPinky < dIndex)  return { label: '6', confidence: 0.85 }
+  if (dIndex < 0.07) return { label: 'O', confidence: 0.88 }
   return null
 }
 
@@ -148,13 +148,89 @@ function rule_U_R(lm) {
  * ISL 7 (some systems): middle tip touches thumb
  * ISL 8 (some systems): index tip touches thumb
  */
-function rule_7_8(lm) {
-  const thumbTip  = lm[4]
-  const dIndex  = dist(lm[8],  thumbTip)
-  const dMiddle = dist(lm[12], thumbTip)
+/**
+ * D vs 1
+ * ISL D: index up, thumb + M/R/P curled into circle under index
+ * ISL 1: index up only, thumb to side / not touching middle base
+ */
+function rule_D_1(lm) {
+  const indexUp = I(lm)
+  if (!indexUp) return null
+  if (!Mc(lm) || !Rc(lm) || !Pc(lm)) return null
 
-  if (dMiddle < dIndex - 0.03)  return { label: '7', confidence: 0.82 }
-  if (dIndex  < dMiddle - 0.03) return { label: '8', confidence: 0.80 }
+  const thumbToMiddle = dist(lm[4], lm[9]) < 0.13
+  const thumbToRing = dist(lm[4], lm[13]) < 0.14
+  if (thumbToMiddle || thumbToRing) return { label: 'D', confidence: 0.9 }
+  if (Pc(lm) && dist(lm[4], lm[8]) > 0.12) return { label: '1', confidence: 0.88 }
+  return null
+}
+
+function fingerDownRule(lm, tip, pip, mcp) {
+  if (lm[tip].y < lm[pip].y - 0.022) return false
+  const reach = dist(lm[tip], lm[mcp])
+  const pipReach = dist(lm[pip], lm[mcp])
+  const extended = reach > pipReach * 0.72
+  const downY = lm[tip].y > lm[pip].y - 0.008
+  const longReach = dist(lm[tip], lm[0]) > 0.08
+  return extended && (downY || longReach)
+}
+
+function rule_N_M_W(lm) {
+  if (I(lm) && Mi(lm) && R(lm) && !P(lm)) return { label: 'W', confidence: 0.9 }
+
+  const iD = fingerDownRule(lm, 8, 6, 5)
+  const mD = fingerDownRule(lm, 12, 10, 9)
+  const rD = fingerDownRule(lm, 16, 14, 13)
+  const rCurled = Rc(lm) || !rD
+
+  if (iD && mD && rCurled && !rD) return { label: 'N', confidence: 0.92 }
+  if (iD && mD && rD) return { label: 'M', confidence: 0.92 }
+  return null
+}
+
+function rule_M_C(lm) {
+  const r = rule_N_M_W(lm)
+  if (r?.label === 'M' || r?.label === 'N') return r
+  return null
+}
+
+function rule_M_W(lm) {
+  return rule_N_M_W(lm)
+}
+
+function rule_2_8(lm) {
+  if (!I(lm) || !Mi(lm) || !Rc(lm) || !Pc(lm)) return null
+
+  const thumbUp = lm[4].y < lm[3].y - 0.035
+  const farThumb = dist(lm[4], lm[5]) > 0.10
+  const nearThumb = dist(lm[4], lm[5]) < 0.095
+  const thumbDown = lm[4].y >= lm[3].y - 0.02
+
+  if (thumbUp && farThumb) return { label: '8', confidence: 0.94 }
+  if (thumbDown && nearThumb) return { label: '2', confidence: 0.94 }
+
+  let s8 = 0
+  let s2 = 0
+  if (lm[4].y < lm[3].y - 0.02) s8 += 2
+  if (dist(lm[4], lm[5]) > 0.09) s8 += 2
+  if (dist(lm[4], lm[5]) < 0.09) s2 += 2
+  if (lm[4].y >= lm[3].y) s2 += 2
+  if (s8 > s2 + 1) return { label: '8', confidence: 0.88 }
+  if (s2 > s8 + 1) return { label: '2', confidence: 0.88 }
+  return null
+}
+
+function rule_7_8(lm) {
+  const indexBent = lm[8].y >= lm[6].y - 0.012
+  if (indexBent && Ic(lm) && Mc(lm) && Rc(lm)) return { label: '7', confidence: 0.91 }
+  return rule_2_8(lm)
+}
+
+function rule_9_thumb(lm) {
+  const thumbDown = lm[4].y > lm[3].y + 0.02 && lm[4].y > lm[0].y + 0.03
+  if (thumbDown && Ic(lm) && Mc(lm) && Rc(lm) && Pc(lm)) {
+    return { label: '9', confidence: 0.92 }
+  }
   return null
 }
 
@@ -163,11 +239,17 @@ function rule_7_8(lm) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const RULES = [
+  { labels: new Set(['D', '1']),  fn: rule_D_1,  threshold: 0.70 },
+  { labels: new Set(['M', 'N', 'C', '0', 'W']), fn: rule_N_M_W, threshold: 0.65 },
+  { labels: new Set(['M', 'C', '0']), fn: rule_M_C, threshold: 0.72 },
+  { labels: new Set(['M', 'W']), fn: rule_M_W, threshold: 0.72 },
   { labels: new Set(['2', '3']),  fn: rule_2_3,  threshold: 0.97 },
   { labels: new Set(['M', 'N']),  fn: rule_M_N,  threshold: 0.92 },
   { labels: new Set(['O', '6']),  fn: rule_O_6,  threshold: 0.92 },
   { labels: new Set(['U', 'R']),  fn: rule_U_R,  threshold: 0.88 },
-  { labels: new Set(['7', '8']),  fn: rule_7_8,  threshold: 0.88 },
+  { labels: new Set(['2', '8']), fn: rule_2_8, threshold: 0.65 },
+  { labels: new Set(['7', '8', '2']), fn: rule_7_8, threshold: 0.75 },
+  { labels: new Set(['9', '0', 'A']), fn: rule_9_thumb, threshold: 0.75 },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,8 +312,33 @@ function debugFrame(lm, mlLabel, mlConf, finalLabel, finalConf) {
  *    (geometry is more reliable for these specific pairs)
  *  - If geo returns null (ambiguous) → ML result unchanged
  */
-export function disambiguate(mlResult, rawLandmarks) {
+export function disambiguate(mlResult, rawLandmarks, rawLandmarks2 = null) {
   if (!mlResult || !rawLandmarks || rawLandmarks.length < 21) return mlResult
+
+  if (rawLandmarks2?.length === 21) {
+    const b = detectLetterB(rawLandmarks, rawLandmarks2)
+    if (b) {
+      return {
+        label: b.label,
+        confidence: b.confidence,
+        topK: b.topK,
+        source: 'two_hand_b',
+        _mlLabel: mlResult.label,
+        _mlConf: mlResult.confidence,
+      }
+    }
+    const g = detectLetterG(rawLandmarks, rawLandmarks2)
+    if (g) {
+      return {
+        label: g.label,
+        confidence: g.confidence,
+        topK: g.topK,
+        source: 'two_hand_g',
+        _mlLabel: mlResult.label,
+        _mlConf: mlResult.confidence,
+      }
+    }
+  }
 
   const { label: mlLabel, confidence: mlConf, topK } = mlResult
 

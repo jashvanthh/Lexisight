@@ -1,0 +1,53 @@
+# verZ — canonical dataset registry for LexiSight multi-corpus training
+
+version: verZ-0.1
+
+datasets:
+  include:
+    path: Datasets/INCLUDE_FULL DATASET
+    type: video
+    role: backbone
+    min_clips_per_class: 1
+    signer_field: filename  # MVI_*
+
+  cislr:
+    path: Datasets/CISLR DATASET copy
+    type: video
+    role: extension
+    min_clips_per_class: 3
+    merge_with: [include, daily]
+    notes: Do not train on all 4700 classes raw — filter sparse classes
+
+  daily:
+    path: New Datasets/ISL_Daily_Words
+    type: video
+    role: high_depth_core
+    min_clips_per_class: 10
+    priority: high
+
+  emergency:
+    path: "New Datasets/ISL_Emergency_Situations/A Video Dataset of the Hand Gestures of Indian Sign Language Words used in Emergency Situations"
+    type: video
+    role: multi_signer_core
+    min_clips_per_class: 5
+    priority: high
+
+  alphabet_1:
+    path: New Datasets/ISL_Alphabet_Numbers_1
+    type: image
+    role: static_only
+    target_model: static
+
+  alphabet_voxera:
+    path: New Datasets/ISL_Alphabet_Numbers_Voxera
+    type: image
+    role: static_only
+    target_model: static
+
+training:
+  temporal:
+    input_frames: 30
+    input_features: 126
+    manifest_out: ml/data_processed/manifest_verz.csv
+    checkpoint_out: training_logs/verz_best.keras
+    label_map_out: public/model/label_map_verz.json

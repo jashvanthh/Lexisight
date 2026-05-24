@@ -1,7 +1,52 @@
-node_modules/
-dist/
+# ── Raw video datasets (too large for GitHub) ──
 Datasets/
+New Datasets/
+
+# ── Processed model files & logs (Too large for GitHub) ──
+*.npy
+*.h5
+*.keras
+
+# ── Node modules (regenerate with npm install) ──
+node_modules/
+
+# ── Training outputs ──
+training_logs/*.log
+training_logs/*.json
+
+# ── Python ──
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Vite / Build ──
+dist/
+.vite/
+
+# ── Dictionary preview videos (copied from datasets, too large) ──
+public/library/
+public/library/include/
+public/library/cislr/
+public/library/letters/
+public/library/numbers/
+# Committed SVG placeholders (letters/numbers) when full library not copied
+!public/dictionary-media/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Env ──
+.env
+.env.*
+!.env.example
 .env.local
 src/.env.local
+
+# Lexisight Auxiliary Files
+TODO_REMAINING_CHANGES.md
+lexisight_silence_v11.html
 calling_system_architecture.md
 punctuation_engine_guide.md

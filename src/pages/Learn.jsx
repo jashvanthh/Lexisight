@@ -4,6 +4,7 @@ import { useTranslation } from '../hooks/useTranslation.js'
 import { LESSON_PLAN, getTotalSigns, getTotalXP } from '../data/lessonPlan.js'
 import { useMediaPipe } from '../hooks/useMediaPipe.js'
 import { useSharedClassifier } from '../contexts/ClassifierContext.jsx' // FIX — shared
+import { TWO_HAND_LETTERS } from '../utils/islTwoHandLetters.js'
 import HandOverlay from '../components/HandOverlay.jsx'
 
 const AvatarScene = lazy(() => import('../components/avatar/AvatarScene.jsx'))
@@ -115,11 +116,23 @@ function PracticeSign({ sign, chapter, onPass, onSkip, mediapipe, classifier }) 
   // Score the current gesture every 500ms
   useEffect(() => {
     if (passed || !mediapipe.handDetected || !mediapipe.landmarks) return
+
+    if (TWO_HAND_LETTERS.has(sign.word) && (!mediapipe.rawLandmarks2 || mediapipe.rawLandmarks2.length < 21)) {
+      setFeedback(`Show both hands clearly for letter ${sign.word}`)
+      return
+    }
+
     const now = Date.now()
     if (now - lastCheckRef.current < 500) return
     lastCheckRef.current = now
 
-    const result = classifier.predict(mediapipe.landmarks, mediapipe.rawLandmarks)
+    const result = classifier.predict(
+      mediapipe.landmarks,
+      mediapipe.rawLandmarks,
+      mediapipe.rawLandmarks2,
+      mediapipe.landmarks2,
+      mediapipe.getHolisticFrame?.() ?? null,
+    )
     if (!result) return
 
     const isTarget = result.label === sign.word
@@ -137,7 +150,17 @@ function PracticeSign({ sign, chapter, onPass, onSkip, mediapipe, classifier }) 
     } else {
       setFeedback('Show your hand clearly to the camera')
     }
-  }, [mediapipe.landmarks, mediapipe.handDetected, passed, sign, classifier, onPass])
+  }, [
+    mediapipe.landmarks,
+    mediapipe.rawLandmarks,
+    mediapipe.rawLandmarks2,
+    mediapipe.landmarks2,
+    mediapipe.handDetected,
+    passed,
+    sign,
+    classifier,
+    onPass,
+  ])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
@@ -167,6 +190,11 @@ function PracticeSign({ sign, chapter, onPass, onSkip, mediapipe, classifier }) 
         </p>
         <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           💡 {sign.tip}
+          {TWO_HAND_LETTERS.has(sign.word) && (
+            <span style={{ display: 'block', marginTop: 6, color: '#8b5cf6' }}>
+              Use both hands — show your full upper body so both hands stay in frame.
+            </span>
+          )}
         </p>
       </div>
 
@@ -231,8 +259,17 @@ export default function Learn() {
     setActiveLesson(lesson)
     setSignIdx(0)
     setLessonDone(false)
+    if (chapter.id === 'alphabet') classifier.setMode('letter')
+    else if (chapter.id === 'numbers') classifier.setMode('number')
+    else classifier.setMode('word')
     mediapipe.initialize()
-  }, [mediapipe])
+  }, [mediapipe, classifier])
+
+  useEffect(() => {
+    if (!activeLesson) {
+      classifier.setMode('word')
+    }
+  }, [activeLesson, classifier])
 
   const handlePass = useCallback((conf) => {
     const key = `${activeChapter.id}-${activeLesson.signs[signIdx].word}`

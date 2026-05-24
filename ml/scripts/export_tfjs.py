@@ -14,10 +14,12 @@ BASE_DIR = Path(__file__).parent.parent.parent
 
 sys.path.insert(0, str(BASE_DIR))
 from ml.models.temporal_v1 import PositionalEncoding, TransformerEncoderBlock
+from ml.scripts.train_holistic import FocalCategoricalCrossentropy
 
 custom_objects = {
     "PositionalEncoding": PositionalEncoding,
-    "TransformerEncoderBlock": TransformerEncoderBlock
+    "TransformerEncoderBlock": TransformerEncoderBlock,
+    "FocalCategoricalCrossentropy": FocalCategoricalCrossentropy,
 }
 
 
@@ -108,16 +110,32 @@ def main():
     
     public_model = BASE_DIR / "public" / "model"
     
-    # 1. Temporal model (words)
+    # 1. verZ-Plus holistic temporal (live production model)
+    verz_path = BASE_DIR / "training_logs" / "verz_plus_best.keras"
+    if verz_path.exists():
+        model = tf.keras.models.load_model(
+            str(verz_path), custom_objects=custom_objects, compile=False
+        )
+        convert_to_tfjs_manual(model, public_model / "verz_plus_tfjs", "verZ-Plus Holistic")
+        del model
+        label_src = public_model / "label_map_verz_plus.json"
+        if label_src.exists():
+            print(f"  Label map: {label_src} ({len(json.load(open(label_src)))} classes)")
+    else:
+        print("verZ-Plus model not found at training_logs/verz_plus_best.keras")
+
+    # 2. Legacy temporal model (words) — optional backup
     temporal_path = BASE_DIR / "training_logs" / "temporal_best.keras"
     if temporal_path.exists():
-        model = tf.keras.models.load_model(str(temporal_path), custom_objects=custom_objects)
+        model = tf.keras.models.load_model(
+            str(temporal_path), custom_objects=custom_objects, compile=False
+        )
         convert_to_tfjs_manual(model, public_model / "tfjs_model", "Temporal (Words)")
         del model
     else:
-        print("Temporal model not found")
+        print("Legacy temporal model not found")
     
-    # 2. Static model (letters/digits)
+    # 3. Static model (letters/digits)
     static_path = BASE_DIR / "training_logs" / "static_best.keras"
     if static_path.exists():
         model = tf.keras.models.load_model(str(static_path))
@@ -128,7 +146,8 @@ def main():
     
     print(f"\n{'='*60}")
     print("  EXPORT COMPLETE")
-    print("  Temporal: public/model/tfjs_model/model.json")
+    print("  verZ-Plus: public/model/verz_plus_tfjs/model.json")
+    print("  Legacy:   public/model/tfjs_model/model.json")
     print("  Static:   public/model/static_tfjs_model/model.json")
     print(f"{'='*60}")
 

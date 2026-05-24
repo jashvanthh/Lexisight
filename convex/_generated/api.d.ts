@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as feedback from "../feedback.js";
 import type * as rooms from "../rooms.js";
 import type * as signaling from "../signaling.js";
 
@@ -18,6 +19,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  feedback: typeof feedback;
   rooms: typeof rooms;
   signaling: typeof signaling;
 }>;

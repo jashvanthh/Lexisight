@@ -1022,7 +1022,7 @@ const NUMBER_HAND_SHAPES = {
   5: 'flat',         // Open palm, all 5 extended
   6: 'six',          // Thumb + ring touch, others open
   7: 'seven',        // Thumb + middle touch, others open
-  8: 'eight',        // Thumb + index circle, others open
+  8: 'threeFingers', // Thumb + index + middle up; ring + pinky down
   9: 'nine',         // Hooked index + thumb, others open
 }
 

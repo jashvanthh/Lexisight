@@ -3,10 +3,12 @@
  * Uses a sliding window vote with confidence weighting
  */
 export class PredictionSmoother {
-  constructor(windowSize = 10, threshold = 0.75) {
+  constructor(windowSize = 10, threshold = 0.75, opts = {}) {
     this.history = []
     this.windowSize = windowSize
     this.threshold = threshold
+    this.lockDuration = opts.lockFrames ?? 45
+    this.minVoteWeight = opts.minVoteWeight ?? null
     this.lastConfirmed = null
     this.lockFrames = 0
     this.framesSinceLast = 0
@@ -24,15 +26,13 @@ export class PredictionSmoother {
 
     this.framesSinceLast = 0
 
-    // Release lock early if we see a different strong gesture
+    // Ignore live previews — only full-buffer predictions can confirm a word
+    if (prediction.isPreview) {
+      return this.lastConfirmed
+    }
+
+    // Hold confirmed label during lock (no early release on high-confidence flicker)
     if (this.lockFrames > 0) {
-      if (
-        prediction.confidence > 0.9 &&
-        this.lastConfirmed &&
-        prediction.label !== this.lastConfirmed.label
-      ) {
-        this.lockFrames = Math.min(this.lockFrames, 5)
-      }
       this.lockFrames--
       return this.lastConfirmed
     }
@@ -54,13 +54,19 @@ export class PredictionSmoother {
 
     const sorted = Object.entries(votes).sort((a, b) => b[1] - a[1])
     const [winnerLabel, winnerScore] = sorted[0]
-    const avgConf = winnerScore / this.windowSize
+    const voteTotal = Object.values(votes).reduce((a, b) => a + b, 0)
+    const avgConf = winnerScore / Math.max(1, this.history.length)
 
-    if (avgConf > this.threshold) {
-      const newConfirmed = { label: winnerLabel, confidence: avgConf }
+    const minWeight = this.minVoteWeight ?? this.threshold * this.windowSize * 0.45
+    if (voteTotal >= minWeight && avgConf > this.threshold * 0.85) {
+      const newConfirmed = {
+        label: winnerLabel,
+        confidence: Math.min(0.99, avgConf),
+        topK: prediction.topK || this.lastConfirmed?.topK,
+      }
       if (!this.lastConfirmed || winnerLabel !== this.lastConfirmed.label) {
         this.lastConfirmed = newConfirmed
-        this.lockFrames = 20 // ~0.67s at 30fps
+        this.lockFrames = this.lockDuration
         return this.lastConfirmed
       }
     }

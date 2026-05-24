@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-05-23T11:43:13Z",
+  "checkpoint": "C:\\Users\\Navat\\OneDrive\\Desktop\\Lexisight\\training_logs\\temporal_best.keras",
+  "error": "no_processed_clips",
+  "note": "Run landmark extraction for oracle videos first.",
+  "oracle_videos": 160
+}

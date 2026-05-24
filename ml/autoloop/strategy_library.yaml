@@ -1,0 +1,25 @@
+# Failure category → interventions (AutoLoop Stage 4)
+
+strategies:
+  low_support:
+    - speed_augment_4x
+    - spatial_jitter
+  high_confusion:
+    - hard_negative_injection
+    - confusion_pair_oversample
+  overfitting:
+    - dropout_increase
+    - weight_decay_increase
+  signer_generalization:
+    - emergency_oversample_3x
+    - signer_disjoint_enforce
+  calibration:
+    - temperature_sweep
+  speed_sensitivity:
+    - temporal_speed_augment
+
+defaults:
+  dropout: 0.3
+  weight_decay: 0.01
+  emergency_loss_weight: 1.0
+  temperature: 1.05

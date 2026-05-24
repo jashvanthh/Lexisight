@@ -1,0 +1,32 @@
+# LexiSight AutoLoop — verZ full corpus + Emergency oracle
+
+version: autoloop-0.1
+model_name: verZ
+checkpoint: training_logs/verz_plus_best.keras
+label_map: public/model/label_map_verz.json
+tfjs_out: public/model/tfjs_model_verz
+
+oracle:
+  manifest_filter: emergency
+  signers_file: ml/autoloop/oracle_signers.json
+  min_clips_per_signer: 5
+
+stopping:
+  generalization_score_min: 0.80
+  overfit_gap_max_pp: 0.10
+  classes_below_70_pct_max: 30
+  ece_max: 0.05
+  no_improvement_iters: 3
+  stuck_iters: 5
+
+training:
+  base_config: ml/configs/train_temporal.yaml
+  seq_len: 30
+  features: 126
+  min_clips_per_class: 3
+
+paths:
+  manifest_verz: ml/data_processed/manifest_verz.csv
+  eval_output: ml/autoloop/autoloop_eval.json
+  history: ml/autoloop/autoloop_history.json
+  strategies: ml/autoloop/strategy_state.json

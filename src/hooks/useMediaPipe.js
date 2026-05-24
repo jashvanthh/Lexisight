@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { FilesetResolver, HolisticLandmarker } from '@mediapipe/tasks-vision'
 import { useSettings } from './useSettings.jsx'
 import { normalizeLandmarks } from '../utils/landmarks.js'
+import { holisticResultToVector } from '../utils/holisticFeatures.js'
 import { LandmarkKalmanFilter } from '../utils/kalmanFilter.js'
 import { telemetry } from '../utils/observability.js'
 
@@ -11,6 +13,7 @@ export function useMediaPipe() {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const handsRef = useRef(null)
+  const holisticRef = useRef(null)
   const animFrameRef = useRef(null)
   const kalmanRef = useRef(new LandmarkKalmanFilter())
   const kalman2Ref = useRef(new LandmarkKalmanFilter())
@@ -20,6 +23,8 @@ export function useMediaPipe() {
   const [rawLandmarks, setRawLandmarks] = useState(null)
   const [landmarks2, setLandmarks2] = useState(null)
   const [rawLandmarks2, setRawLandmarks2] = useState(null)
+  /** Updated every frame; read via getHolisticFrame() — not React state (avoids re-render storms). */
+  const holisticFrameRef = useRef(null)
   const [handDetected, setHandDetected] = useState(false)
   const [hand2Detected, setHand2Detected] = useState(false)
   const [fps, setFps] = useState(0)
@@ -154,6 +159,22 @@ export function useMediaPipe() {
 
       handsRef.current = hands
 
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm',
+        )
+        holisticRef.current = await HolisticLandmarker.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: '/mediapipe/holistic_landmarker.task' },
+          runningMode: 'VIDEO',
+          minPoseDetectionConfidence: 0.4,
+          minPoseLandmarksConfidence: 0.4,
+          minHandLandmarksConfidence: 0.4,
+        })
+      } catch (holisticErr) {
+        console.warn('[LexiSight] Holistic landmarker failed to load:', holisticErr)
+        holisticRef.current = null
+      }
+
       // Build video constraints — prefer specific device or front-facing
       // Use ONLY deviceId if we have it (avoids strict facingMode on laptops)
       const resolvedId = cameraId || await enumerateCameras()
@@ -220,6 +241,15 @@ export function useMediaPipe() {
         if (frameSkipRef.current % 2 === 0) {
           await handsRef.current.send({ image: videoRef.current })
         }
+        // Holistic is heavy — run every 4th processed frame (~7–8 Hz), store in ref only
+        if (holisticRef.current && frameSkipRef.current % 8 === 0) {
+          try {
+            const res = holisticRef.current.detectForVideo(videoRef.current, performance.now())
+            holisticFrameRef.current = holisticResultToVector(res)
+          } catch {
+            /* skip bad frame */
+          }
+        }
       }
       animFrameRef.current = requestAnimationFrame(loop)
     }
@@ -236,6 +266,11 @@ export function useMediaPipe() {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
     if (handsRef.current) handsRef.current.close()
+    if (holisticRef.current) {
+      holisticRef.current.close()
+      holisticRef.current = null
+    }
+    holisticFrameRef.current = null
     setIsReady(false)
     setHandDetected(false)
     setHand2Detected(false)
@@ -249,6 +284,8 @@ export function useMediaPipe() {
     return () => stop()
   }, [stop])
 
+  const getHolisticFrame = useCallback(() => holisticFrameRef.current, [])
+
   return {
     videoRef,
     canvasRef,
@@ -256,6 +293,7 @@ export function useMediaPipe() {
     rawLandmarks,
     landmarks2,
     rawLandmarks2,
+    getHolisticFrame,
     handDetected,
     hand2Detected,
     fps,

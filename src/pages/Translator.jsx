@@ -8,10 +8,12 @@ import { useVideoMode } from '../hooks/useVideoMode.js'
 import { useSettings } from '../hooks/useSettings.jsx'
 import { useTranslation } from '../hooks/useTranslation.js'
 import { PredictionSmoother, SentenceBuilder } from '../utils/smoothing.js'
+import PredictionLockRail from '../components/PredictionLockRail.jsx'
+import { useFeedbackConvex, FeedbackConvexProvider } from '../providers/FeedbackConvexProvider.jsx'
 import { DEMO_SEQUENCE } from '../utils/gestureMap.js'
 import HandOverlay from '../components/HandOverlay.jsx'
 import ConfidenceWaveform from '../components/ConfidenceWaveform.jsx'
-import ConfidenceTopK from '../components/ConfidenceTopK.jsx'
+import LiveSignPanel from '../components/LiveSignPanel.jsx'
 // REMOVED: HandAvatar — replaced Speech→Sign with Speech→Word
 import VoiceSelector from '../components/VoiceSelector.jsx'
 import PhotoTranslator from '../components/PhotoTranslator.jsx'
@@ -19,7 +21,9 @@ import VideoTranslator from '../components/VideoTranslator.jsx'
 import { toast } from '../components/ToastNotif.jsx'
 import { PHRASE_PACKS } from '../data/phrasePacks.js'
 
-const smoother = new PredictionSmoother(10, 0.75)
+const smoother = new PredictionSmoother(14, 0.82)
+const letterSmoother = new PredictionSmoother(6, 0.45, { lockFrames: 150, minVoteWeight: 1.0 })
+const numberSmoother = new PredictionSmoother(6, 0.45, { lockFrames: 150, minVoteWeight: 1.0 })
 const sentenceBuilder = new SentenceBuilder(2000)
 
 // ─── Camera Panel — MUST be defined OUTSIDE Translator ──────────────────────
@@ -283,7 +287,7 @@ function useIsDesktop() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Translator() {
+function TranslatorPage() {
   const { settings } = useSettings()
   const { t } = useTranslation()
   const [mode, setMode] = useState('word') // 'word', 'letter', 'number'
@@ -297,10 +301,14 @@ export default function Translator() {
   const [showCameraMenu, setShowCameraMenu] = useState(false)
 
   const [currentPrediction, setCurrentPrediction] = useState(null)
+  const [livePrediction, setLivePrediction] = useState(null)
+  const [lockInEnabled, setLockInEnabled] = useState(true)
+  const pinnedPredictionRef = useRef(null)
   const [detectionLog, setDetectionLog] = useState([])
   const [autoSpeak, setAutoSpeak] = useState(false)
   const [sentence, setSentence] = useState('')
   const lastAddedRef = useRef(null)
+  const lastAddedTimeRef = useRef(0)
 
   // REMOVED: animSpeed, avatarGesture, wordTimerRef — no longer needed for Speech→Word
 
@@ -309,6 +317,7 @@ export default function Translator() {
 
   const mediapipe = useMediaPipe()
   const classifier = useSharedClassifier() // FIX — shared
+  const { recordFeedback, applyRuntimeCorrection, convexReady } = useFeedbackConvex()
   const synth = useSpeechSynth()
   const recognition = useSpeechRecog()
   const photoMode = usePhotoMode()
@@ -316,71 +325,125 @@ export default function Translator() {
 
   const isLoading = classifier.status === 'loading'
 
-  // ── Inference ─────────────────────────────────────────────────
+  // ── Inference (throttled rAF — avoids crash from holistic state + TF every frame) ──
   useEffect(() => {
-    if (!mediapipe.handDetected || !mediapipe.landmarks) {
-      noHandRef.current++
-      if (noHandRef.current > 90) setShowHandPrompt(true)
-      
-      // Notify classifier of no hand to reset sequence buffers
-      classifier.predict(null, null, null, null)
-
-      // Graceful decay of prediction smoother when hand leaves the camera frame
-      const smoothed = smoother.add(null)
-      setCurrentPrediction(smoothed)
-      return
+    if (!mediapipe.isReady || demoMode || classifier.isDemoMode || classifier.status === 'demo') {
+      return undefined
     }
-    noHandRef.current = 0
-    setShowHandPrompt(false)
 
-    if (demoMode || classifier.isDemoMode || classifier.status === 'demo') return
+    let rafId = 0
+    let lastInfer = 0
+    const INFER_MS = 120 // ~8 predictions/sec max
 
-    // Pass both normalized landmarks array AND raw objects for Geometric fallback
-    const raw = classifier.predict(
-      mediapipe.landmarks,
-      mediapipe.rawLandmarks,
-      mediapipe.rawLandmarks2,
-      mediapipe.landmarks2
-    )
+    const tick = () => {
+      rafId = requestAnimationFrame(tick)
+      const t = performance.now()
+      if (t - lastInfer < INFER_MS) return
+      lastInfer = t
 
-    const smoothed = smoother.add(raw)
-    
-    // Update live fluctuating prediction HUD on EVERY single frame
-    setCurrentPrediction(smoothed)
+      if (!mediapipe.handDetected || !mediapipe.landmarks) {
+        noHandRef.current++
+        if (noHandRef.current > 90) setShowHandPrompt(true)
+        try {
+          classifier.predict(null, null, null, null, null)
+        } catch (e) {
+          console.warn('[Translator] predict reset failed:', e)
+        }
+        smoother.add(null)
+        letterSmoother.add(null)
+        numberSmoother.add(null)
+        pinnedPredictionRef.current = null
+        setCurrentPrediction(null)
+        setLivePrediction(null)
+        return
+      }
 
-    // Sentence building and speech feedback only triggers on a NEW distinct word detection
-    if (smoothed && smoothed.label !== lastAddedRef.current) {
-      lastAddedRef.current = smoothed.label
-      const now = new Date().toLocaleTimeString('en-IN', { hour12: false })
-      setDetectionLog(prev => [{ label: smoothed.label, confidence: smoothed.confidence, time: now }, ...prev.slice(0, 29)])
-      setSentence(sentenceBuilder.addWord(smoothed.label))
-      if (autoSpeak) synth.speak(smoothed.label)
-      toast.success(`Detected: ${smoothed.label}`, 1200)
+      noHandRef.current = 0
+      setShowHandPrompt(false)
 
-      // Update Impact stats
-      const curTrans = parseInt(localStorage.getItem('lxi_stat_translations') || '142', 10)
-      localStorage.setItem('lxi_stat_translations', curTrans + 1)
-      
-      const gesturesSeen = JSON.parse(localStorage.getItem('lxi_seen_gestures') || '{}')
-      if (!gesturesSeen[smoothed.label]) {
-        gesturesSeen[smoothed.label] = true
-        localStorage.setItem('lxi_seen_gestures', JSON.stringify(gesturesSeen))
-        const curGestures = parseInt(localStorage.getItem('lxi_stat_gestures') || '89', 10)
-        localStorage.setItem('lxi_stat_gestures', curGestures + 1)
+      if (classifier.status !== 'ready' && classifier.status !== 'geometric') return
+
+      let raw = null
+      try {
+        raw = classifier.predict(
+          mediapipe.landmarks,
+          mediapipe.rawLandmarks,
+          mediapipe.rawLandmarks2,
+          mediapipe.landmarks2,
+          mediapipe.getHolisticFrame?.() ?? null,
+        )
+      } catch (e) {
+        console.warn('[Translator] predict failed:', e)
+        return
+      }
+
+      const corrected = raw ? applyRuntimeCorrection(raw, classifier.mode) : null
+      setLivePrediction(corrected)
+
+      const activeSmoother =
+        classifier.mode === 'letter'
+          ? letterSmoother
+          : classifier.mode === 'number'
+            ? numberSmoother
+            : smoother
+      const smoothed = activeSmoother.add(corrected)
+
+      if (lockInEnabled) {
+        if (smoothed) pinnedPredictionRef.current = smoothed
+        setCurrentPrediction(pinnedPredictionRef.current)
+      } else {
+        pinnedPredictionRef.current = null
+        setCurrentPrediction(corrected)
+      }
+
+      const cooldownMs = (settings.predictionCooldown ?? 1.2) * 1000
+      const nowMs = Date.now()
+      if (
+        smoothed &&
+        !smoothed.isPreview &&
+        smoothed.label !== lastAddedRef.current &&
+        nowMs - lastAddedTimeRef.current >= cooldownMs
+      ) {
+        lastAddedRef.current = smoothed.label
+        lastAddedTimeRef.current = nowMs
+        const timeStr = new Date().toLocaleTimeString('en-IN', { hour12: false })
+        setDetectionLog(prev => [{ label: smoothed.label, confidence: smoothed.confidence, time: timeStr }, ...prev.slice(0, 29)])
+        setSentence(sentenceBuilder.addWord(smoothed.label))
+        if (autoSpeak) synth.speak(smoothed.label)
+        toast.success(`Detected: ${smoothed.label}`, 1200)
+
+        const curTrans = parseInt(localStorage.getItem('lxi_stat_translations') || '142', 10)
+        localStorage.setItem('lxi_stat_translations', curTrans + 1)
+
+        const gesturesSeen = JSON.parse(localStorage.getItem('lxi_seen_gestures') || '{}')
+        if (!gesturesSeen[smoothed.label]) {
+          gesturesSeen[smoothed.label] = true
+          localStorage.setItem('lxi_seen_gestures', JSON.stringify(gesturesSeen))
+          const curGestures = parseInt(localStorage.getItem('lxi_stat_gestures') || '89', 10)
+          localStorage.setItem('lxi_stat_gestures', curGestures + 1)
+        }
       }
     }
+
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
   }, [
-    mediapipe.landmarks,
+    mediapipe.isReady,
     mediapipe.handDetected,
+    mediapipe.landmarks,
     mediapipe.rawLandmarks,
     mediapipe.rawLandmarks2,
     mediapipe.landmarks2,
+    mediapipe.getHolisticFrame,
     classifier.predict,
+    classifier.status,
     demoMode,
     classifier.isDemoMode,
-    classifier.status,
     autoSpeak,
     synth,
+    settings.predictionCooldown,
+    lockInEnabled,
+    classifier.mode,
   ])
 
   // ── Photo/Video mode detection handling ─────────────────────
@@ -411,10 +474,14 @@ export default function Translator() {
   useEffect(() => {
     lastAddedRef.current = null
     setCurrentPrediction(null)
+    setLivePrediction(null)
     setDetectionLog([])
     setSentence('')
     sentenceBuilder.clear()
     smoother.reset()
+    letterSmoother.reset()
+    numberSmoother.reset()
+    pinnedPredictionRef.current = null
   }, [inputMode, classifier.mode])
   useEffect(() => {
     if (demoMode) {
@@ -456,6 +523,9 @@ export default function Translator() {
     setSentence('')
     sentenceBuilder.clear()
     smoother.reset()
+    letterSmoother.reset()
+    numberSmoother.reset()
+    pinnedPredictionRef.current = null
     lastAddedRef.current = null
     setCurrentPrediction(null)
   }, [])
@@ -486,7 +556,7 @@ export default function Translator() {
     rawLandmarks: mediapipe.rawLandmarks,
     rawLandmarks2: mediapipe.rawLandmarks2,
     handDetected: mediapipe.handDetected,
-    confidence: currentPrediction?.confidence || 0,
+    confidence: livePrediction?.confidence || currentPrediction?.confidence || 0,
     isReady: mediapipe.isReady,
     cameraPermission: mediapipe.cameraPermission,
     showHandPrompt,
@@ -496,7 +566,7 @@ export default function Translator() {
     onEnable: handleStartCamera,
     showCameraMenu,
     setShowCameraMenu,
-    predictionLabel: currentPrediction?.label || null,
+    predictionLabel: livePrediction?.label || currentPrediction?.label || null,
   }
 
   // ── Status bar ───────────────────────────────────────────────
@@ -536,7 +606,7 @@ export default function Translator() {
             appearance: 'none',
           }}
         >
-          <option value="word" style={{ background: 'var(--surface)' }}>Word Mode (v4 Temporal) [Ver1]</option>
+          <option value="word" style={{ background: 'var(--surface)' }}>Word Mode (Ver1 live · verZ training)</option>
           <option value="letter" style={{ background: 'var(--surface)' }}>Letter Mode (v2 MLP)</option>
           <option value="number" style={{ background: 'var(--surface)' }}>Number Mode (Geometric)</option>
         </select>
@@ -608,27 +678,74 @@ export default function Translator() {
 
   // ══ Shared UI blocks ════════════════════════════════════════
 
+  const handleFeedback = useCallback(
+    async (isCorrect, correctLabel = null) => {
+      const pred = currentPrediction || livePrediction
+      if (!pred?.label) return
+
+      await recordFeedback({
+        predicted: pred.label,
+        isCorrect,
+        correctLabel: isCorrect ? pred.label : correctLabel,
+        mode: classifier.mode,
+        confidence: pred.confidence,
+        topK: pred.topK,
+      })
+
+      if (!isCorrect && correctLabel) {
+        pinnedPredictionRef.current = {
+          ...pred,
+          label: correctLabel,
+          confidence: Math.max(pred.confidence ?? 0, 0.9),
+          source: 'user_correction',
+        }
+        setCurrentPrediction(pinnedPredictionRef.current)
+        toast.success(
+          convexReady
+            ? `Saved to cloud: meant "${correctLabel}" (not ${pred.label})`
+            : `Saved locally: meant "${correctLabel}" (not ${pred.label})`,
+          2000,
+        )
+      } else {
+        toast.success(
+          convexReady
+            ? isCorrect
+              ? 'Thanks — saved to cloud ✓'
+              : 'Thanks — saved to cloud'
+            : isCorrect
+              ? 'Thanks — marked correct'
+              : 'Thanks — marked wrong',
+          1500,
+        )
+      }
+    },
+    [currentPrediction, livePrediction, classifier.mode, recordFeedback, convexReady],
+  )
+
   const PredictionBlock = (
-    <div className="flex items-end gap-3">
+    <div className="flex gap-0 items-stretch" style={{ position: 'relative' }}>
       <div className="flex-1 min-w-0">
-        <div className="hud-label mb-1">{t('detected_gesture')}</div>
-        <div
-          className="font-dm font-black leading-none"
-          style={{
-            fontSize: 'clamp(2.8rem, 5vw, 5rem)',
-            color: currentPrediction ? '#00ff88' : '#2a3545',
-            textShadow: currentPrediction ? '0 0 30px rgba(0,255,136,0.4)' : 'none',
-            minHeight: 64,
-            transition: 'color 0.2s, text-shadow 0.2s',
-          }}
-        >
-          {currentPrediction?.label || '—'}
-        </div>
+        <LiveSignPanel
+          live={livePrediction}
+          confirmed={currentPrediction}
+          bufferProgress={livePrediction?.bufferFill ?? 0}
+          handDetected={mediapipe.handDetected}
+          mode={classifier.mode}
+          lockInEnabled={lockInEnabled}
+          t={t}
+        />
       </div>
-      {currentPrediction?.topK && (
-        <div style={{ width: 176, flexShrink: 0 }}>
-          <ConfidenceTopK topK={currentPrediction.topK} />
-        </div>
+      {inputMode === 'live' && (
+        <PredictionLockRail
+          lockInEnabled={lockInEnabled}
+          onLockInChange={setLockInEnabled}
+          displayLabel={currentPrediction?.label}
+          displayConfidence={currentPrediction?.confidence ?? 0}
+          mode={classifier.mode}
+          topK={currentPrediction?.topK || livePrediction?.topK || []}
+          onFeedback={handleFeedback}
+          convexSynced={convexReady}
+        />
       )}
     </div>
   )
@@ -657,23 +774,6 @@ export default function Translator() {
     </div>
   ) : null
 
-  const handleFeedback = (isCorrect) => {
-    if (!currentPrediction) return
-    
-    // Save to local storage for now until backend API is ready (Phase 5)
-    const feedbackData = JSON.parse(localStorage.getItem('lxi_feedback') || '[]')
-    feedbackData.push({
-      label: currentPrediction.label,
-      confidence: currentPrediction.confidence,
-      isCorrect: isCorrect,
-      timestamp: new Date().toISOString()
-    })
-    localStorage.setItem('lxi_feedback', JSON.stringify(feedbackData))
-    
-    console.log(`Feedback saved locally: ${currentPrediction.label} is ${isCorrect ? 'Correct' : 'Incorrect'}`)
-    toast.success('Feedback recorded. Thank you!', 1500)
-  }
-
   const DetectionLog = (
     <div className="terminal-log" style={{ maxHeight: 130 }}>
       {detectionLog.length === 0
@@ -683,12 +783,6 @@ export default function Translator() {
             <span style={{ color: '#1a4535', fontSize: '0.6rem' }}>[{e.time}]</span>
             <span style={{ color: i === 0 ? '#00ff88' : '#4a8a6a', fontWeight: i === 0 ? 700 : 400 }}>{e.label}</span>
             <span style={{ color: '#1a4535', marginLeft: 'auto' }}>{(e.confidence * 100).toFixed(0)}%</span>
-            {i === 0 && (
-              <div className="flex gap-1 ml-2">
-                <button onClick={() => handleFeedback(true)} style={{ padding: '0 4px', fontSize: '0.7rem', color: '#00ff88', border: '1px solid #00ff88', borderRadius: '4px' }}>✓</button>
-                <button onClick={() => handleFeedback(false)} style={{ padding: '0 4px', fontSize: '0.7rem', color: '#ff3366', border: '1px solid #ff3366', borderRadius: '4px' }}>✗</button>
-              </div>
-            )}
           </div>
         ))}
     </div>
@@ -1041,6 +1135,19 @@ export default function Translator() {
                 />}
                 
                 {PredictionBlock}
+                {inputMode === 'live' && (
+                  <PredictionLockRail
+                    compact
+                    lockInEnabled={lockInEnabled}
+                    onLockInChange={setLockInEnabled}
+                    displayLabel={currentPrediction?.label}
+                    displayConfidence={currentPrediction?.confidence ?? 0}
+                    mode={classifier.mode}
+                    topK={currentPrediction?.topK || livePrediction?.topK || []}
+                    onFeedback={handleFeedback}
+                    convexSynced={convexReady}
+                  />
+                )}
                 <ConfidenceWaveform confidence={currentPrediction?.confidence || 0} isActive={!!currentPrediction} compact />
                 {SentenceBlock}
                 {SignControls}
@@ -1099,5 +1206,13 @@ export default function Translator() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function Translator() {
+  return (
+    <FeedbackConvexProvider>
+      <TranslatorPage />
+    </FeedbackConvexProvider>
   )
 }

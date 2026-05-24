@@ -7,6 +7,8 @@
     "sync-models": "node scripts/sync-models.js",
     "predev": "npm run sync-models",
     "dev": "vite",
+    "convex:dev": "convex dev",
+    "convex:deploy": "node scripts/convex-deploy.mjs",
     "prebuild": "npm run sync-models",
     "build": "vite build",
     "preview": "vite preview",
@@ -14,6 +16,7 @@
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.6",
+    "@mediapipe/tasks-vision": "^0.10.35",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.17.10",
     "@tensorflow/tfjs": "^4.22.0",

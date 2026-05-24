@@ -108,26 +108,6 @@ export default function HandOverlay({ rawLandmarks, rawLandmarks2, handDetected,
           ctx.shadowBlur = 0
         }
 
-        if (lms[8] && !isSecondary) {
-          const tip = lms[8]
-          const hudX = tip.x * w < w / 2 ? tip.x * w + 15 : tip.x * w - 115
-          const hudY = tip.y * h < 60 ? tip.y * h + 20 : tip.y * h - 40
-
-          ctx.fillStyle = 'rgba(8, 13, 20, 0.8)'
-          ctx.beginPath()
-          ctx.roundRect(hudX - 5, hudY - 14, 110, 48, 4)
-          ctx.fill()
-
-          ctx.strokeStyle = 'rgba(0, 212, 255, 0.3)'
-          ctx.lineWidth = 0.5
-          ctx.stroke()
-
-          ctx.fillStyle = '#00d4ff'
-          ctx.font = '10px JetBrains Mono, monospace'
-          ctx.fillText(`x: ${tip.x.toFixed(3)}`, hudX, hudY)
-          ctx.fillText(`y: ${tip.y.toFixed(3)}`, hudX, hudY + 14)
-          ctx.fillText(`z: ${(tip.z || 0).toFixed(3)}`, hudX, hudY + 28)
-        }
       }
 
       drawHand(rawLandmarks)

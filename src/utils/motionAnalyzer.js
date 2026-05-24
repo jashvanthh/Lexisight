@@ -15,6 +15,7 @@
  *   WHAT  — finger flutter (spread fingers oscillating side-to-side)
  *   NO    — index wag (single index oscillating left-right)
  *   COME  — beckoning (fingers curling inward repeatedly)
+ *   HELLO — open hand at head/temple, waves or sweeps outward
  *   HELP  — upward fist lift (fist moving upward)
  *   J     — arc-and-hook trajectory (index only, downward arc)
  *   Z     — zigzag trajectory (index only, Z-pattern)
@@ -201,7 +202,8 @@ export class MotionAnalyzer {
     const idxOscY      = oscillationCount(idxDy)
     const midOscX      = oscillationCount(midDx)
 
-    // Finger pose in latest frame
+    // Finger pose + wrist height (MediaPipe y grows downward — small y = near top/head)
+    const first = this.buffer[0]
     const latest = this.buffer[n - 1]
     const I = isExtended(latest, IDX_TIP, IDX_PIP)
     const M = isExtended(latest, MID_TIP, MID_PIP)
@@ -209,6 +211,8 @@ export class MotionAnalyzer {
     const P = isExtended(latest, PNK_TIP, PNK_PIP)
     const T = thumbExtended(latest)
     const extCount = [I, M, R, P].filter(Boolean).length
+    const wristYStart = first[WRIST].y
+    const wristYEnd = latest[WRIST].y
 
     return {
       meanVelocity,
@@ -216,6 +220,8 @@ export class MotionAnalyzer {
       oscillationX, oscillationY,
       idxOscX, idxOscY,
       midOscX,
+      wristYStart,
+      wristYEnd,
       pose: { I, M, R, P, T, extCount },
       n,
     }
@@ -240,11 +246,46 @@ export class MotionAnalyzer {
       meanVelocity, netDx, netDy,
       oscillationX, oscillationY,
       idxOscX, idxOscY, midOscX,
+      wristYStart, wristYEnd,
       pose, n,
     } = f
 
     // Hand is static — let the existing static classifier handle it
     if (meanVelocity < STATIC_VELOCITY_THRESHOLD) return null
+
+    const openHand =
+      pose.extCount >= 4 || (pose.I && pose.M && pose.R && pose.P)
+    const atHeadLevel = wristYStart < 0.42 || wristYEnd < 0.45
+    const sweptAwayFromHead =
+      Math.abs(netDx) > 0.03 ||
+      (wristYEnd - wristYStart > 0.02 && Math.abs(netDx) > 0.018)
+    const waveAtHead =
+      oscillationX >= 2 &&
+      atHeadLevel &&
+      Math.abs(netDx) >= 0.02
+    const isWhatFlutter =
+      pose.extCount >= 3 &&
+      idxOscX >= 3 &&
+      midOscX >= 3 &&
+      oscillationX >= 3 &&
+      Math.abs(netDx) < 0.07 &&
+      Math.abs(netDy) < 0.07
+
+    // ── HELLO: flat open hand at temple/head, wave or sweep away ───────────
+    // ISL greeting: palm near cheek/forehead, moves outward (not in-place WHAT).
+    if (
+      openHand &&
+      atHeadLevel &&
+      !isWhatFlutter &&
+      (sweptAwayFromHead || waveAtHead) &&
+      meanVelocity > 0.006
+    ) {
+      const conf =
+        0.84 +
+        Math.min(0.11, Math.abs(netDx) * 2.5) +
+        (waveAtHead ? 0.03 : 0)
+      return makeResult('HELLO', conf)
+    }
 
     // DEBUG — enable with: window.__lexiMotionDebug = true
     if (typeof window !== 'undefined' && window.__lexiMotionDebug) {

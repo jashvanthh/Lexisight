@@ -5,7 +5,7 @@
 
 export const ISL_DICTIONARY = [
   // ── Letters ──────────────────────────────────────────────────
-  { id: 'A', label: 'A', category: 'alphabet', description: 'Closed fist, thumb on side', fingers: { thumb: 'side', index: 'curl', middle: 'curl', ring: 'curl', pinky: 'curl' }, emoji: '✊' },
+  { id: 'A', label: 'A', category: 'alphabet', description: 'Both hands: tight fists, thumb tips touching', fingers: { thumb: 'touch', index: 'curl', middle: 'curl', ring: 'curl', pinky: 'curl' }, emoji: '✊✊' },
   { id: 'B', label: 'B', category: 'alphabet', description: 'Four fingers straight up together, thumb across palm', fingers: { thumb: 'across', index: 'up', middle: 'up', ring: 'up', pinky: 'up' }, emoji: '🖐️' },
   { id: 'C', label: 'C', category: 'alphabet', description: 'Hand curved into a C shape', fingers: { thumb: 'curve', index: 'curve', middle: 'curve', ring: 'curve', pinky: 'curve' }, emoji: '🤏' },
   { id: 'D', label: 'D', category: 'alphabet', description: 'Index up, others circle with thumb', fingers: { thumb: 'circle', index: 'up', middle: 'circle', ring: 'circle', pinky: 'circle' }, emoji: '☝️' },

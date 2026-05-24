@@ -1,0 +1,12 @@
+{
+  "dropout": 0.3,
+  "weight_decay": 0.01,
+  "emergency_loss_weight": 1.0,
+  "temperature": 1.05,
+  "active_strategies": [
+    "run_extraction"
+  ],
+  "focus": "no_data",
+  "rationale": "no_processed_clips",
+  "confusion_pairs": []
+}

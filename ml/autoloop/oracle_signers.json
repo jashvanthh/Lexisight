@@ -1,0 +1,7 @@
+{
+  "dataset": "emergency",
+  "description": "8 Emergency signers permanently held out — never in any training run. AutoLoop optimizes Generalization Score on these only.",
+  "locked_at": "2026-05-23",
+  "signer_ids": ["s001", "s002", "s003", "s004", "s005", "s006", "s007", "s008"],
+  "train_signer_ids_note": "All other parsed signers (s009–s021, etc.) may appear in training. Videos without signer tag are excluded from oracle eval."
+}

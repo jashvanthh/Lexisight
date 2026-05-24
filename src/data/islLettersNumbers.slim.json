@@ -1,0 +1,349 @@
+{
+  "source": "Letters + Numbers",
+  "mediaVersion": 1779598274,
+  "count": 36,
+  "libraries": {
+    "letters": {
+      "id": "letters",
+      "title": "Alphabet A–Z",
+      "icon": "🔤",
+      "accent": "#8b5cf6",
+      "folder": "library/letters",
+      "count": 26
+    },
+    "numbers": {
+      "id": "numbers",
+      "title": "Numbers 0–9",
+      "icon": "🔢",
+      "accent": "#00ff88",
+      "folder": "library/numbers",
+      "count": 10
+    }
+  },
+  "items": [
+    {
+      "id": "letters_a",
+      "label": "A",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/A.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_b",
+      "label": "B",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/B.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_c",
+      "label": "C",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/C.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_d",
+      "label": "D",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/D.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_e",
+      "label": "E",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/E.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_f",
+      "label": "F",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/F.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_g",
+      "label": "G",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/G.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_h",
+      "label": "H",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/H.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_i",
+      "label": "I",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/I.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_j",
+      "label": "J",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/J.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_k",
+      "label": "K",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/K.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_l",
+      "label": "L",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/L.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_m",
+      "label": "M",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/M.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_n",
+      "label": "N",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/N.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_o",
+      "label": "O",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/O.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_p",
+      "label": "P",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/P.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_q",
+      "label": "Q",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/Q.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_r",
+      "label": "R",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/R.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_s",
+      "label": "S",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/S.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_t",
+      "label": "T",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/T.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_u",
+      "label": "U",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/U.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_v",
+      "label": "V",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/V.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_w",
+      "label": "W",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/W.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_x",
+      "label": "X",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/X.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_y",
+      "label": "Y",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/Y.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "letters_z",
+      "label": "Z",
+      "category": "Alphabet",
+      "source": "Letters",
+      "library": "letters",
+      "video": "/library/letters/Z.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_0",
+      "label": "0",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/dictionary-media/numbers/0.svg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_1",
+      "label": "1",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/1.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_2",
+      "label": "2",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/2.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_3",
+      "label": "3",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/3.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_4",
+      "label": "4",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/4.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_5",
+      "label": "5",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/5.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_6",
+      "label": "6",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/6.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_7",
+      "label": "7",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/7.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_8",
+      "label": "8",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/8.jpg",
+      "mediaType": "image"
+    },
+    {
+      "id": "numbers_9",
+      "label": "9",
+      "category": "Numbers",
+      "source": "ISL_Alphabet_Numbers_1",
+      "library": "numbers",
+      "video": "/library/numbers/9.jpg",
+      "mediaType": "image"
+    }
+  ]
+}

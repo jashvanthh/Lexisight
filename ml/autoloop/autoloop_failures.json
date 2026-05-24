@@ -1,0 +1,10 @@
+{
+  "failures": [
+    {
+      "category": "no_data",
+      "severity": 1.0,
+      "message": "no_processed_clips"
+    }
+  ],
+  "focus": "no_data"
+}

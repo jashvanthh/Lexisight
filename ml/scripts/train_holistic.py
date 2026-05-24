@@ -138,6 +138,17 @@ class CosineDecayCallback(Callback):
         self.model.optimizer.learning_rate.assign(lr)
 
 
+class ResumeStateCallback(Callback):
+  def __init__(self, path: Path):
+      super().__init__()
+      self.path = path
+
+  def on_epoch_end(self, epoch, logs=None):
+      self.path.parent.mkdir(parents=True, exist_ok=True)
+      with open(self.path, "w", encoding="utf-8") as f:
+          json.dump({"initial_epoch": int(epoch) + 1}, f)
+
+
 class OverfitDetector(Callback):
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
@@ -247,51 +258,75 @@ def augment_holistic_batch(x_batch, config):
 
 class BalancedHolisticDataGen(tf.keras.utils.Sequence):
     def __init__(self, df, batch_size, n_classes, config, augment=False,
-                 hard_neg_mining=False, desc=""):
+                 hard_neg_mining=False, lazy_load=False, desc=""):
         self.bs = batch_size
         self.n_classes = n_classes
         self.config = config
         self.augment = augment
-        self.hard_neg_mining = hard_neg_mining
+        self.hard_neg_mining = hard_neg_mining and not lazy_load
+        self.lazy_load = lazy_load
+        self.y_ids = df["class_id"].to_numpy(dtype=np.int32)
+        self.clip_paths = [
+            ML_DIR / "data_processed" / str(p)
+            for p in df["clip_path"]
+        ]
 
-        print(f"[{desc}] Loading {len(df)} holistic clips into RAM...")
-        self.X = np.zeros((len(df), SEQ_LEN, HOLISTIC_DIM), dtype=np.float32)
-        self.y_ids = np.zeros(len(df), dtype=np.int32)
-        loaded = 0
-
-        for i, (_, row) in enumerate(df.iterrows()):
-            if i > 0 and i % 1000 == 0:
-                print(f"  Loaded {i}/{len(df)}...")
-            path = ML_DIR / "data_processed" / row["clip_path"]
-            if path.exists():
-                try:
-                    arr = np.load(path).astype(np.float32)
-                    self.X[i] = arr.reshape(SEQ_LEN, HOLISTIC_DIM)
-                    loaded += 1
-                except Exception:
-                    pass
-            self.y_ids[i] = int(row["class_id"])
+        if lazy_load:
+            print(f"[{desc}] Lazy-load mode: {len(df)} clips (read .npy per batch)")
+            self.X = None
+            n = len(df)
+        else:
+            print(f"[{desc}] Loading {len(df)} holistic clips into RAM...")
+            self.X = np.zeros((len(df), SEQ_LEN, HOLISTIC_DIM), dtype=np.float32)
+            loaded = 0
+            for i, (_, row) in enumerate(df.iterrows()):
+                if i > 0 and i % 1000 == 0:
+                    print(f"  Loaded {i}/{len(df)}...")
+                path = ML_DIR / "data_processed" / row["clip_path"]
+                if path.exists():
+                    try:
+                        arr = np.load(path).astype(np.float32)
+                        self.X[i] = arr.reshape(SEQ_LEN, HOLISTIC_DIM)
+                        loaded += 1
+                    except Exception:
+                        pass
+                self.y_ids[i] = int(row["class_id"])
+            n = len(self.X)
+            print(f"[{desc}] Loaded {loaded}/{len(df)}, hard_neg={self.hard_neg_mining}")
 
         self.class_indices = {}
         for idx, class_id in enumerate(self.y_ids):
-            self.class_indices.setdefault(class_id, []).append(idx)
+            self.class_indices.setdefault(int(class_id), []).append(idx)
 
         if self.hard_neg_mining:
             self._apply_confusion_pair_oversample()
+            n = len(self.X)
 
-        self.balanced_indices = np.arange(len(self.X))
+        self.balanced_indices = np.arange(n)
         self.on_epoch_end()
-        print(f"[{desc}] Loaded {loaded}/{len(df)}, hard_neg={self.hard_neg_mining}")
 
     def __len__(self):
         return int(np.ceil(len(self.balanced_indices) / self.bs))
+
+    def _load_sample(self, sample_idx: int) -> np.ndarray:
+        if not self.lazy_load:
+            return self.X[sample_idx].copy()
+        out = np.zeros((SEQ_LEN, HOLISTIC_DIM), dtype=np.float32)
+        path = self.clip_paths[sample_idx]
+        if path.exists():
+            try:
+                arr = np.load(path).astype(np.float32)
+                out = arr.reshape(SEQ_LEN, HOLISTIC_DIM)
+            except Exception:
+                pass
+        return out
 
     def __getitem__(self, index):
         start = index * self.bs
         end = min((index + 1) * self.bs, len(self.balanced_indices))
         idx = self.balanced_indices[start:end]
 
-        x_batch = self.X[idx].copy()
+        x_batch = np.stack([self._load_sample(int(i)) for i in idx], axis=0)
         y_batch = np.zeros((len(idx), self.n_classes), dtype=np.float32)
         for j, sample_idx in enumerate(idx):
             y_batch[j, self.y_ids[sample_idx]] = 1.0
@@ -301,8 +336,9 @@ class BalancedHolisticDataGen(tf.keras.utils.Sequence):
         return x_batch, y_batch
 
     def on_epoch_end(self):
+        n = len(self.clip_paths) if self.lazy_load else len(self.X)
         if not self.augment:
-            self.balanced_indices = np.arange(len(self.X))
+            self.balanced_indices = np.arange(n)
             return
 
         max_per_class = max(len(v) for v in self.class_indices.values())
@@ -365,18 +401,74 @@ class BalancedHolisticDataGen(tf.keras.utils.Sequence):
 
 
 def make_split(df, seed):
-    if df["signer_id"].nunique() <= 1:
-        return train_test_split(df, test_size=0.15, stratify=df["class_id"], random_state=seed)
+    """Stratified split guaranteeing at least 1 val clip per class.
 
-    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
-    train_idx, val_idx = next(sgkf.split(df, df["class_id"], df["signer_id"]))
-    return df.iloc[train_idx].copy(), df.iloc[val_idx].copy()
+    For each class, reserve 1 clip for val unconditionally, then take
+    an additional 15% of the remainder stratified. This ensures every
+    class is represented in val regardless of signer count.
+    """
+    rng = np.random.default_rng(seed)
+    train_rows, val_rows = [], []
+    for cls, grp in df.groupby("class_id"):
+        grp = grp.sample(frac=1, random_state=int(rng.integers(1 << 31)))
+        n = len(grp)
+        if n == 1:
+            # only 1 clip — keep in train, nothing for val
+            train_rows.append(grp)
+            continue
+        # always put 1 in val
+        val_rows.append(grp.iloc[:1])
+        rest = grp.iloc[1:]
+        if len(rest) <= 1:
+            train_rows.append(rest)
+        else:
+            # take 15% of the remainder for val (min 0 extra)
+            n_extra = max(0, round(len(rest) * 0.15))
+            val_rows.append(rest.iloc[:n_extra])
+            train_rows.append(rest.iloc[n_extra:])
+    train_df = pd.concat(train_rows).sample(frac=1, random_state=seed)
+    val_df = pd.concat(val_rows).sample(frac=1, random_state=seed)
+    return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
 
 
 def save_history(history, out_path):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(history.history, f, indent=2)
+
+
+def _read_log_text(log_path: Path) -> str:
+    raw = log_path.read_bytes()
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        return raw.decode("utf-16", errors="ignore")
+    if raw[:4:2] == b"\x00\x00" or (len(raw) > 2 and raw[1:2] == b"\x00"):
+        return raw.decode("utf-16-le", errors="ignore")
+    return raw.decode("utf-8", errors="ignore")
+
+
+def detect_initial_epoch(history_path: Path, log_path: Path | None = None) -> int:
+    """Return next epoch index (0-based) from saved history or training log."""
+    resume_path = history_path.parent / "verz_plus_resume.json"
+    if resume_path.exists():
+        with open(resume_path, encoding="utf-8") as f:
+            data = json.load(f)
+        epoch = int(data.get("initial_epoch", 0))
+        if epoch > 0:
+            return epoch
+    if history_path.exists():
+        with open(history_path, encoding="utf-8") as f:
+            history = json.load(f)
+        for key in ("loss", "accuracy", "val_loss", "val_accuracy"):
+            if key in history and history[key]:
+                return len(history[key])
+    if log_path and log_path.exists():
+        import re
+
+        text = _read_log_text(log_path)
+        epochs = [int(m) for m in re.findall(r"Epoch (\d+): val_accuracy", text)]
+        if epochs:
+            return max(epochs)
+    return 0
 
 
 def main():
@@ -386,6 +478,22 @@ def main():
                         help="Enable confusion-pair oversampling and loss boosting")
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
+    parser.add_argument(
+        "--lazy-load",
+        action="store_true",
+        help="Load .npy per batch instead of preloading all clips into RAM",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Load best checkpoint and continue from the last completed epoch",
+    )
+    parser.add_argument(
+        "--initial-epoch",
+        type=int,
+        default=None,
+        help="Override resume epoch index (0-based)",
+    )
     args = parser.parse_args()
 
     config_path = BASE_DIR / args.config
@@ -477,10 +585,14 @@ def main():
     model.summary()
 
     batch_size = int(training_cfg.get("batch_size", 32))
-    train_gen = BalancedHolisticDataGen(train_df, batch_size, n_classes, config, augment=True,
-                                         hard_neg_mining=args.hard_neg_mining, desc="Train")
-    val_gen = BalancedHolisticDataGen(val_df, batch_size, n_classes, config, augment=False,
-                                       hard_neg_mining=False, desc="Val")
+    train_gen = BalancedHolisticDataGen(
+        train_df, batch_size, n_classes, config, augment=True,
+        hard_neg_mining=args.hard_neg_mining, lazy_load=args.lazy_load, desc="Train",
+    )
+    val_gen = BalancedHolisticDataGen(
+        val_df, batch_size, n_classes, config, augment=False,
+        hard_neg_mining=False, lazy_load=args.lazy_load, desc="Val",
+    )
 
     logs_dir = BASE_DIR / "training_logs"
     logs_dir.mkdir(exist_ok=True)
@@ -510,6 +622,7 @@ def main():
             warmup_epochs=int(training_cfg.get("warmup_epochs", 5)),
         ),
         OverfitDetector(),
+        ResumeStateCallback(logs_dir / "verz_plus_resume.json"),
     ]
 
     print("\n--- Starting V2 holistic training ---")
@@ -521,7 +634,31 @@ def main():
     print(f"Checkpoint: {model_path}")
     print()
 
-    history = model.fit(train_gen, validation_data=val_gen, epochs=epochs, callbacks=callbacks)
+    initial_epoch = 0
+    if args.resume and model_path.exists():
+        print(f"Loading weights: {model_path}")
+        model.load_weights(str(model_path))
+        initial_epoch = (
+            args.initial_epoch
+            if args.initial_epoch is not None
+            else detect_initial_epoch(history_path, logs_dir / "verz_plus_train.log")
+        )
+        print(f"Resuming at epoch {initial_epoch + 1}/{epochs}")
+    elif args.resume:
+        print(f"Resume requested but no checkpoint at {model_path}; training from scratch.")
+
+    history = model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=epochs,
+        initial_epoch=initial_epoch,
+        callbacks=callbacks,
+    )
+    if history_path.exists() and initial_epoch > 0:
+        with open(history_path, encoding="utf-8") as f:
+            prior = json.load(f)
+        merged = {k: prior.get(k, []) + history.history.get(k, []) for k in history.history}
+        history.history = merged
     save_history(history, history_path)
 
     best_val = max(history.history.get("val_accuracy", [0.0]))

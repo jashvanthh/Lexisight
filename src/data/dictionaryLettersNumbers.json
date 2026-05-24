@@ -1,0 +1,23 @@
+{
+  "letters": {
+    "title": "Alphabet A–Z",
+    "icon": "🔤",
+    "accent": "#8b5cf6",
+    "folder": "letters",
+    "source": "Letters",
+    "category": "Alphabet",
+    "items": [
+      "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+      "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
+    ]
+  },
+  "numbers": {
+    "title": "Numbers 0–9",
+    "icon": "🔢",
+    "accent": "#00ff88",
+    "folder": "numbers",
+    "source": "ISL_Alphabet_Numbers_1",
+    "category": "Numbers",
+    "items": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+  }
+}
