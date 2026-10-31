@@ -1,58 +1,64 @@
-# ═══════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 # LexiSight — Confirmed Training Parameters (paper-v1)
-# ═══════════════════════════════════════════════════════════════
-# These values reflect the settings used to train the model that
-# produced the results in the IEEE paper (tag: paper-v1).
-# Only edit this file if you retrain with different settings.
+# ════════════════════════════════════════════════════════════════
+# Values marked CONFIRMED were read directly from training logs.
+# Values marked UNCONFIRMED are best estimates — do not cite them
+# in the paper without checking the actual training script output.
 
 temporal:
-  # Architecture
-  input_frames: 30          # 1 second at 30 fps
-  features: 126             # 21 landmarks × 3 coords × 2 hands
-  d_model: 128              # projection dimension
-  heads: 4                  # attention heads
-  blocks: 2                 # transformer layers (holistic_v3 uses 3 — confirm before changing)
-  feedforward_dim: 256
-  dropout: 0.2
-  classifier_hidden: 64
+  # ── Architecture ─────────────────────────────────────────────
+  input_frames: 30          # CONFIRMED — 1 second at 30 fps
+  features: 126             # CONFIRMED — 21 landmarks × 3 coords × 2 hands
+  d_model: 128              # CONFIRMED — projection dimension
+  heads: 4                  # CONFIRMED — attention heads
+  blocks: 2                 # CONFIRMED — transformer layers (paper-v1 model)
+                            #   NOTE: holistic_v3 uses 3 blocks — different model
+  feedforward_dim: 256      # CONFIRMED
+  dropout: 0.2              # CONFIRMED
+  classifier_hidden: 64     # CONFIRMED
 
-  # Training — Phase 1
-  optimizer: adamw
-  lr: 0.001
-  weight_decay: 0.01
-  batch_size: 64
-  epochs: 100
-  warmup_epochs: 5
-  label_smoothing: 0.1
-  early_stopping_patience: 20
+  # ── Training — Phase 1 ───────────────────────────────────────
+  optimizer: adamw          # CONFIRMED
+  lr: 0.001                 # CONFIRMED
+  weight_decay: 0.01        # UNCONFIRMED — check train_holistic_v2.py
+  batch_size: 64            # CONFIRMED
+  epochs: 100               # CONFIRMED
+  warmup_epochs: 5          # UNCONFIRMED — check train_holistic_v2.py
+  label_smoothing: 0.1      # UNCONFIRMED — check train_holistic_v2.py
+  early_stopping_patience: 20  # UNCONFIRMED — check train_holistic_v2.py
 
-  # Training — Phase 2 (signer-disjoint fine-tune)
-  phase2_lr: 0.0001
-  phase2_epochs: 50
-  phase2_batch_size: 32
+  # ── Training — Phase 2 (fine-tune) ──────────────────────────
+  phase2_lr: 0.0001         # CONFIRMED
+  phase2_epochs: 50         # CONFIRMED
+  phase2_batch_size: 32     # CONFIRMED
 
-  # Data
-  split_strategy: signer_disjoint
-  val_ratio: 0.15
-  seed: 42
-  num_classes: 263
+  # ── Data ─────────────────────────────────────────────────────
+  split_strategy: stratified_random   # CONFIRMED (NOT signer-disjoint for paper-v1)
+  val_ratio: 0.20                     # CONFIRMED — 80/20 split
+  seed: 42                            # CONFIRMED
+  num_classes: 263                    # CONFIRMED
 
+# ════════════════════════════════════════════════════════════════
+# holistic_v3 — Later experiment (NOT the paper model)
+# Included for reference / future work
+# ════════════════════════════════════════════════════════════════
 holistic_v3:
-  # Architecture (hard-negative mining variant)
-  input_dim: 126
-  num_classes: 263
-  hidden_dim: 256
-  heads: 8
-  blocks: 3
-  dropout: 0.30
-  l2_reg: 0.002
+  # ── Architecture (hard-negative mining variant) ──────────────
+  input_dim: 126            # CONFIRMED
+  num_classes: 263          # CONFIRMED
+  hidden_dim: 256           # UNCONFIRMED
+  heads: 8                  # CONFIRMED
+  blocks: 3                 # CONFIRMED — this is why blocks=3 was confused with paper model
+  dropout: 0.30             # UNCONFIRMED
+  l2_reg: 0.002             # UNCONFIRMED
 
-  # Training
-  optimizer: adamw
-  lr: 0.001
-  batch_size: 32
-  epochs: 60
-  warmup_epochs: 3
-  label_smoothing: 0.05
-  focal_gamma: 1.5
-  seed: 42
+  # ── Training ─────────────────────────────────────────────────
+  optimizer: adamw          # CONFIRMED
+  lr: 0.001                 # CONFIRMED
+  batch_size: 32            # UNCONFIRMED
+  epochs: 60                # CONFIRMED
+  warmup_epochs: 3          # UNCONFIRMED
+  label_smoothing: 0.05     # UNCONFIRMED
+  focal_gamma: 1.5          # UNCONFIRMED
+  seed: 42                  # CONFIRMED
+  split_strategy: signer_disjoint  # CONFIRMED — fairer evaluation
