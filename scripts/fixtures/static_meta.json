@@ -1,0 +1,10 @@
+{
+  "accuracy": 0.9964285714285714,
+  "threshold": 0.946,
+  "n_samples": 280,
+  "n_classes": 35,
+  "input_dim": 126,
+  "output_dim": 35,
+  "label_map_offset": -1,
+  "note": "Model output idx = label_map key - 1 (training used 0-indexed classes)"
+}
