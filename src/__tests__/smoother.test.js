@@ -31,7 +31,7 @@ describe('PredictionSmoother', () => {
     smoother.add(pred('HELLO', 0.9))
     smoother.add(pred('HELLO', 0.9))
     const result = smoother.add(pred('HELLO', 0.9))
-    // enough votes above threshold (0.6) — should confirm HELLO
+    // enough votes above threshold (0.6) -- should confirm HELLO
     expect(result).not.toBeNull()
     expect(result.label).toBe('HELLO')
   })
@@ -49,7 +49,7 @@ describe('PredictionSmoother', () => {
     smoother.add(pred('HELLO', 0.95))
     smoother.add(pred('HELLO', 0.95))
     smoother.add(pred('HELLO', 0.95))
-    // Now try to change — lock should hold HELLO for lockFrames=3 more frames
+    // Now try to change -- lock should hold HELLO for lockFrames=3 more frames
     const r1 = smoother.add(pred('WORLD', 0.95))
     const r2 = smoother.add(pred('WORLD', 0.95))
     expect(r1?.label).toBe('HELLO')
@@ -66,7 +66,7 @@ describe('PredictionSmoother', () => {
     expect(smoother.history.length).toBe(0)
   })
 
-  it('window slides — oldest predictions drop out', () => {
+  it('window slides -- oldest predictions drop out', () => {
     // windowSize=5, fill with HELLO
     for (let i = 0; i < 5; i++) smoother.add(pred('HELLO', 0.9))
     // Now add 5 WORLD predictions to push all HELLOs out
@@ -81,4 +81,3 @@ describe('PredictionSmoother', () => {
     expect(s.threshold).toBe(0.5)
   })
 })
-

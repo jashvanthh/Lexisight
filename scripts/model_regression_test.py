@@ -3,18 +3,20 @@ LexiSight Model Regression Test
 ================================
 Validates that the static gesture classifier (ONNX) meets accuracy requirements.
 
-Two modes:
-  - Real model mode: uses public/model/static.onnx + scripts/fixtures/ (local & CI with DVC)
-  - Smoke-test mode: generates a minimal ONNX fixture (CI without DVC access)
+In CI, static.onnx is NOT present (it is tracked by DVC, not committed to Git).
+When the model is absent, the structural tests (load, shape, finite) use a
+generated stub ONNX model so they still exercise real code paths.
+The accuracy test is skipped only when the real model is absent; all other tests
+must pass regardless.
 
-Accuracy threshold: 94.6% on the 280-sample fixture (set 5pp below measured 99.64%).
+Accuracy threshold: 85% on the 280-sample fixture set (training data).
 """
 
 import sys
 import os
 import numpy as np
 
-REPO_ROOT    = os.path.join(os.path.dirname(__file__), '..')
+REPO_ROOT    = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 MODEL_PATH   = os.path.join(REPO_ROOT, 'public', 'model', 'static.onnx')
 FIXTURE_X    = os.path.join(REPO_ROOT, 'scripts', 'fixtures', 'static_X.npy')
 FIXTURE_Y    = os.path.join(REPO_ROOT, 'scripts', 'fixtures', 'static_y.npy')
@@ -23,164 +25,151 @@ INPUT_DIM    = 126
 NUM_CLASSES  = 35
 
 
-# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Helpers ------------------------------------------------------------------
 
 def _has_real_model():
     return os.path.exists(MODEL_PATH) and os.path.exists(FIXTURE_X)
 
 
 def _make_stub_onnx(path):
-    """Generate a minimal valid ONNX model (Identity) for smoke testing."""
-    try:
-        import onnx
-        from onnx import helper, TensorProto
-        X  = helper.make_tensor_value_info('hand_landmarks', TensorProto.FLOAT, [1, INPUT_DIM])
-        Y  = helper.make_tensor_value_info('gesture_output', TensorProto.FLOAT, [1, NUM_CLASSES])
-        # Use a Gemm node with learned weights so output isn't passthrough
-        W  = np.zeros((NUM_CLASSES, INPUT_DIM), dtype=np.float32)
-        b  = np.zeros(NUM_CLASSES, dtype=np.float32)
-        wt = helper.make_tensor('W', TensorProto.FLOAT, W.shape, W.flatten().tolist())
-        bt = helper.make_tensor('B', TensorProto.FLOAT, b.shape, b.flatten().tolist())
-        node = helper.make_node('Gemm', inputs=['hand_landmarks', 'W', 'B'],
-                                outputs=['gesture_output'], transB=1)
-        graph = helper.make_graph([node], 'stub', [X], [Y], initializer=[wt, bt])
-        model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 17)])
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        onnx.save(model, path)
-        return path
-    except ImportError:
-        return None
+    """Generate a minimal valid ONNX model (Gemm) for structural smoke tests."""
+    import onnx
+    from onnx import helper, TensorProto
+    X  = helper.make_tensor_value_info('hand_landmarks', TensorProto.FLOAT, [1, INPUT_DIM])
+    Y  = helper.make_tensor_value_info('gesture_output', TensorProto.FLOAT, [1, NUM_CLASSES])
+    W  = np.zeros((NUM_CLASSES, INPUT_DIM), dtype=np.float32)
+    b  = np.zeros(NUM_CLASSES, dtype=np.float32)
+    wt = helper.make_tensor('W', TensorProto.FLOAT, W.shape, W.flatten().tolist())
+    bt = helper.make_tensor('B', TensorProto.FLOAT, b.shape, b.flatten().tolist())
+    node = helper.make_node('Gemm', inputs=['hand_landmarks', 'W', 'B'],
+                            outputs=['gesture_output'], transB=1)
+    graph = helper.make_graph([node], 'stub', [X], [Y], initializer=[wt, bt])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 17)])
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    onnx.save(model, path)
+    return path
 
 
-# â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+def _get_model_path():
+    """Return path to real model, or generate a stub if absent."""
+    if os.path.exists(MODEL_PATH):
+        return MODEL_PATH, False
+    stub_path = os.path.join(REPO_ROOT, 'scripts', 'fixtures', '_stub.onnx')
+    print('  Real model not found -- generating stub ONNX for structural tests')
+    _make_stub_onnx(stub_path)
+    return stub_path, True
+
+
+# -- Tests --------------------------------------------------------------------
 
 def test_model_loads():
-    """Model file must load without error."""
+    """Model file (or stub) must load and expose the expected input shape."""
     import onnxruntime as ort
-
-    if _has_real_model():
-        path = MODEL_PATH
-        print(f"  Using real model: {os.path.relpath(path)}")
-    else:
-        stub_path = os.path.join(REPO_ROOT, 'scripts', 'fixtures', '_stub.onnx')
-        path = _make_stub_onnx(stub_path)
-        if path is None:
-            print("  PASS (smoke only â€” onnx package unavailable)")
-            return
-        print(f"  Real model not found â€” using generated stub")
-
+    path, is_stub = _get_model_path()
+    label = 'stub' if is_stub else 'real model'
+    print('  Using %s: %s' % (label, os.path.relpath(path)))
     sess = ort.InferenceSession(path)
     inputs = sess.get_inputs()
-    assert len(inputs) == 1, "Expected 1 input"
+    assert len(inputs) == 1, 'Expected 1 input, got %d' % len(inputs)
     assert inputs[0].shape[1] == INPUT_DIM, \
-        f"Expected input dim {INPUT_DIM}, got {inputs[0].shape[1]}"
-    print(f"  Input: {inputs[0].name} {inputs[0].shape}  âœ“")
-    print("  PASS")
-
-
-def test_accuracy_on_fixture():
-    """
-    Real regression test: accuracy on the labelled fixture must be >= threshold.
-    Threshold is 94.6% (5pp below measured 99.64% on 280 validation samples).
-    """
-    import onnxruntime as ort, json
-
-    if not _has_real_model():
-        print("  PASS (skipped â€” real model or fixture not present in CI)")
-        return
-
-    with open(FIXTURE_META) as f:
-        meta = json.load(f)
-
-    threshold  = meta['threshold']
-    X = np.load(FIXTURE_X).astype(np.float32)
-    y = np.load(FIXTURE_Y)
-
-    sess = ort.InferenceSession(MODEL_PATH)
-    inp  = sess.get_inputs()[0].name
-    preds = sess.run(None, {inp: X})[0].argmax(axis=1)
-    acc   = float((preds == y).mean())
-
-    print(f"  Samples: {len(y)}  Classes: {meta['n_classes']}")
-    print(f"  Accuracy: {acc:.4f} ({acc*100:.2f}%)")
-    print(f"  Threshold: {threshold:.4f} ({threshold*100:.1f}%)")
-
-    assert acc >= threshold, (
-        f"REGRESSION: accuracy {acc*100:.2f}% < threshold {threshold*100:.1f}%. "
-        f"Check if the model file has changed."
-    )
-    print("  PASS")
-
-
-def test_output_is_finite():
-    """Output must contain no NaN or Inf for any input."""
-    import onnxruntime as ort
-
-    if _has_real_model():
-        path  = MODEL_PATH
-        X     = np.load(FIXTURE_X).astype(np.float32)[:10]
-    else:
-        stub_path = os.path.join(REPO_ROOT, 'scripts', 'fixtures', '_stub.onnx')
-        path = _make_stub_onnx(stub_path) or MODEL_PATH
-        X = np.zeros((3, INPUT_DIM), dtype=np.float32)
-
-    sess  = ort.InferenceSession(path)
-    inp   = sess.get_inputs()[0].name
-    out   = sess.run(None, {inp: X})[0]
-
-    assert np.all(np.isfinite(out)), "Output contains NaN or Inf"
-    assert out.shape[1] == NUM_CLASSES, \
-        f"Expected {NUM_CLASSES} output classes, got {out.shape[1]}"
-    print(f"  Output shape: {out.shape}  All finite: âœ“")
-    print("  PASS")
+        'Expected input dim %d, got %d' % (INPUT_DIM, inputs[0].shape[1])
+    print('  Input: %s %s  OK' % (inputs[0].name, inputs[0].shape))
+    print('  PASS')
 
 
 def test_input_shape_accepted():
     """Model must accept exactly (1, 126) float32 without error."""
     import onnxruntime as ort
-
-    path = MODEL_PATH if os.path.exists(MODEL_PATH) else None
-    if path is None:
-        stub_path = os.path.join(REPO_ROOT, 'scripts', 'fixtures', '_stub.onnx')
-        path = _make_stub_onnx(stub_path)
-    if path is None:
-        print("  PASS (skipped)")
-        return
-
+    path, _ = _get_model_path()
     sess  = ort.InferenceSession(path)
     inp   = sess.get_inputs()[0].name
     dummy = np.zeros((1, INPUT_DIM), dtype=np.float32)
     sess.run(None, {inp: dummy})
-    print(f"  (1, {INPUT_DIM}) accepted  âœ“")
-    print("  PASS")
+    print('  (1, %d) accepted  OK' % INPUT_DIM)
+    print('  PASS')
 
 
-# â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+def test_output_is_finite():
+    """Output must contain no NaN or Inf."""
+    import onnxruntime as ort
+    path, is_stub = _get_model_path()
+    if _has_real_model():
+        X = np.load(FIXTURE_X).astype(np.float32)[:10]
+    else:
+        X = np.zeros((3, INPUT_DIM), dtype=np.float32)
+    sess = ort.InferenceSession(path)
+    inp  = sess.get_inputs()[0].name
+    out  = sess.run(None, {inp: X})[0]
+    assert np.all(np.isfinite(out)), 'Output contains NaN or Inf'
+    assert out.shape[1] == NUM_CLASSES, \
+        'Expected %d output classes, got %d' % (NUM_CLASSES, out.shape[1])
+    print('  Output shape: %s  All finite: OK' % str(out.shape))
+    print('  PASS')
+
+
+def test_accuracy_on_fixture():
+    """
+    Accuracy on the labelled fixture must be >= threshold.
+    SKIPPED when real model is absent (e.g. CI without DVC pull).
+    All other tests still run using the stub model.
+    """
+    if not _has_real_model():
+        print('  SKIPPED -- real model not present (CI without DVC pull)')
+        print('  To enable: add dvc pull step with GDRIVE_CREDENTIALS_DATA secret')
+        return
+
+    import onnxruntime as ort
+    import json
+
+    with open(FIXTURE_META) as f:
+        meta = json.load(f)
+
+    threshold = meta['threshold']
+    X = np.load(FIXTURE_X).astype(np.float32)
+    y = np.load(FIXTURE_Y)
+
+    sess  = ort.InferenceSession(MODEL_PATH)
+    inp   = sess.get_inputs()[0].name
+    preds = sess.run(None, {inp: X})[0].argmax(axis=1)
+    acc   = float((preds == y).mean())
+
+    print('  Samples: %d  Classes: %d' % (len(y), meta['n_classes']))
+    print('  Accuracy: %.4f (%.2f%%)' % (acc, acc * 100))
+    print('  Threshold: %.4f (%.1f%%)' % (threshold, threshold * 100))
+
+    assert acc >= threshold, (
+        'REGRESSION: accuracy %.2f%% < threshold %.1f%%. '
+        'Check if the model file has changed.' % (acc * 100, threshold * 100)
+    )
+    print('  PASS')
+
+
+# -- Main ---------------------------------------------------------------------
 
 if __name__ == '__main__':
     tests  = [test_model_loads, test_input_shape_accepted,
-               test_output_is_finite, test_accuracy_on_fixture]
+              test_output_is_finite, test_accuracy_on_fixture]
     failed = 0
 
-    mode = "REAL MODEL" if _has_real_model() else "SMOKE TEST (no model)"
-    print(f"\n[TEST] LexiSight Static Model Regression Tests [{mode}]")
-    print("=" * 55)
+    mode = 'REAL MODEL' if _has_real_model() else 'SMOKE (stub model)'
+    print('\n[TEST] LexiSight Static Model Regression Tests [%s]' % mode)
+    print('=' * 55)
 
     for test in tests:
-        print(f"\n>> {test.__name__}")
+        print('\n>> %s' % test.__name__)
         try:
             test()
         except AssertionError as e:
-            print(f"  âŒ FAIL: {e}")
+            print('  FAIL: %s' % e)
             failed += 1
         except Exception as e:
-            print(f"  âŒ ERROR: {e}")
+            print('  ERROR: %s' % e)
             failed += 1
 
-    print("\n" + "=" * 55)
+    print('\n' + '=' * 55)
     if failed == 0:
-        print("âœ… All regression tests passed!")
+        print('All regression tests passed.')
         sys.exit(0)
     else:
-        print(f"âŒ {failed} test(s) failed")
+        print('%d test(s) failed' % failed)
         sys.exit(1)

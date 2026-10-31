@@ -6,7 +6,7 @@
  *   - rawLeft/rawRight: array of {x,y,z} landmarks (21 points) or null
  *   - returns Float32Array of length HOLISTIC_DIM (225)
  *   - pose section (first 99 values) is always zeros (no pose input)
- *   - left hand fills positions 99–161, right hand fills 162–224
+ *   - left hand fills positions 99-161, right hand fills 162-224
  */
 
 import { describe, it, expect } from 'vitest'
@@ -76,8 +76,8 @@ describe('handsToHolisticVector', () => {
     const hand = variedLandmarks(21, 1)
     const leftOnly  = handsToHolisticVector(hand, null)
     const rightOnly = handsToHolisticVector(null, hand)
-    // Left hand → positions POSE_COUNT*3 to (POSE_COUNT+HAND_COUNT)*3 - 1
-    // Right hand → positions (POSE_COUNT+HAND_COUNT)*3 to end
+    // Left hand -> positions POSE_COUNT*3 to (POSE_COUNT+HAND_COUNT)*3 - 1
+    // Right hand -> positions (POSE_COUNT+HAND_COUNT)*3 to end
     const leftSection  = Array.from(leftOnly.slice(POSE_COUNT * 3, (POSE_COUNT + HAND_COUNT) * 3))
     const rightSection = Array.from(rightOnly.slice((POSE_COUNT + HAND_COUNT) * 3))
     // Left-only: left section nonzero, right section zero

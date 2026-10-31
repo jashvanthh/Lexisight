@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { dist2D, isExtended } from '../utils/geoClassifier.js'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 /** Build a minimal 21-point landmark array where all points are at origin */
 function makeLandmarks(overrides = {}) {
@@ -14,7 +14,7 @@ function makeLandmarks(overrides = {}) {
   return lm
 }
 
-// ── dist2D ───────────────────────────────────────────────────────────────────
+// -- dist2D -------------------------------------------------------------------
 
 describe('dist2D', () => {
   it('returns 0 for identical points', () => {
@@ -36,7 +36,7 @@ describe('dist2D', () => {
   })
 })
 
-// ── isExtended ────────────────────────────────────────────────────────────────
+// -- isExtended ---------------------------------------------------------------
 
 describe('isExtended', () => {
   it('returns false for null landmarks', () => {
@@ -50,33 +50,28 @@ describe('isExtended', () => {
   it('returns true when tip is far from base (finger extended)', () => {
     // Build a realistic hand: lm[5] and lm[17] are palm-width apart (0.1),
     // index tip (lm[8]) is far from its base (lm[5])
-    const lm = makeLandmarks({
-      5:  { x: 0.0, y: 0.5 },   // index MCP  (also palm ref point)
-      17: { x: 0.1, y: 0.5 },   // pinky MCP  — palm width ≈ 0.1
-      8:  { x: 0.05, y: 0.0 },  // index tip  — extended upward
-      5:  { x: 0.05, y: 0.5 },  // same as above (baseIdx for tip 8 is 8-3=5)
-    })
-    // Manually set to force clear geometry
-    lm[5]  = { x: 0.0, y: 0.5 }
-    lm[17] = { x: 0.1, y: 0.5 }   // palm width = 0.1
-    lm[8]  = { x: 0.05, y: 0.0 }  // tip far up
-    lm[5]  = { x: 0.05, y: 0.5 }  // base (tipIdx - 3 = 8 - 3 = 5)
+    const lm = makeLandmarks()
+    lm[5]  = { x: 0.05, y: 0.5 }  // index MCP = base for tip 8 (tipIdx - 3 = 5)
+    lm[17] = { x: 0.1,  y: 0.5 }  // pinky MCP -- palm width = 0.1
+    lm[8]  = { x: 0.05, y: 0.0 }  // index tip extended upward
     // dist(tip, base) = dist({0.05,0.0}, {0.05,0.5}) = 0.5
-    // palmWidth = 0.1; threshold = 0.1 * 0.95 = 0.095 → 0.5 > 0.095 ✓
+    // palmWidth = dist(lm[5], lm[17]) = 0.05; threshold = 0.05 * 0.95 = 0.0475
+    // 0.5 > 0.0475 => extended = true
     expect(isExtended(lm, 8, 6)).toBe(true)
   })
 
   it('returns false when tip is close to base (finger curled)', () => {
     const lm = makeLandmarks()
-    lm[5]  = { x: 0.0, y: 0.5 }  // index MCP (also base for tip 8)
-    lm[17] = { x: 0.1, y: 0.5 }  // pinky MCP — palm width = 0.1
-    lm[8]  = { x: 0.01, y: 0.5 } // tip very close to base → curled
-    // dist(tip, base) = 0.01; threshold = 0.095 → 0.01 < 0.095 ✗
+    lm[5]  = { x: 0.0,  y: 0.5 }  // index MCP (base for tip 8)
+    lm[17] = { x: 0.1,  y: 0.5 }  // pinky MCP -- palm width = 0.1
+    lm[8]  = { x: 0.01, y: 0.5 }  // tip very close to base => curled
+    // dist(tip, base) = 0.01; palmWidth = 0.1; threshold = 0.095
+    // 0.01 < 0.095 => extended = false
     expect(isExtended(lm, 8, 6)).toBe(false)
   })
 })
 
-// ── Smoke test: module exports ─────────────────────────────────────────────────
+// -- Smoke test: module exports -----------------------------------------------
 
 describe('geoClassifier exports', () => {
   it('exports dist2D as a function', () => {
