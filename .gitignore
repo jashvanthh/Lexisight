@@ -40,6 +40,10 @@ public/library/numbers/
 Thumbs.db
 desktop.ini
 
+# ── Google OAuth / DVC credentials (NEVER commit these) ──
+client_secret*.json
+.dvc/tmp/
+
 # ── Env ──
 .env
 .env.*
