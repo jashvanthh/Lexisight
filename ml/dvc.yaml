@@ -1,0 +1,30 @@
+# ═══════════════════════════════════════════════════════════════
+# LexiSight — DVC Pipeline Definition
+# ═══════════════════════════════════════════════════════════════
+# Run: dvc repro
+# This only re-runs stages whose inputs (code, data, params) changed.
+
+stages:
+  train_temporal:
+    cmd: python ml/scripts/train_holistic.py --config ml/configs/train_temporal.yaml
+    deps:
+      - ml/configs/train_temporal.yaml
+    params:
+      - ml/params.yaml:
+          - temporal
+    outs:
+      - ml/models/best_temporal.keras
+    metrics:
+      - ml/eval/metrics.json:
+          cache: false
+
+  train_holistic_v3:
+    cmd: python ml/scripts/train_holistic.py --config ml/configs/train_holistic_v3.yaml --hard-neg-mining
+    deps:
+      - ml/configs/train_holistic_v3.yaml
+    params:
+      - ml/params.yaml:
+          - holistic_v3
+    metrics:
+      - ml/eval/metrics.json:
+          cache: false
