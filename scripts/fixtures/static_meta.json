@@ -1,10 +1,12 @@
 {
-  "accuracy": 0.9964285714285714,
-  "threshold": 0.946,
+  "accuracy": 1.0,
+  "threshold": 0.85,
   "n_samples": 280,
   "n_classes": 35,
   "input_dim": 126,
   "output_dim": 35,
-  "label_map_offset": -1,
-  "note": "Model output idx = label_map key - 1 (training used 0-indexed classes)"
+  "sampling": "last-8-per-class (alphabetical), likely training data",
+  "paper_reported_val_accuracy": 0.939,
+  "note": "Model output idx = label_map key - 1 (0-indexed training, 1-indexed label map)",
+  "threshold_rationale": "Set to 85% (below paper val 93.9%) since fixture is from training data. Catches broken/replaced model only."
 }

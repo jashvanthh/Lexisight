@@ -7,7 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  # ── Job 1: Build ──────────────────────────────────────────────────────────
+
+  # Job 1: Build
   build:
     name: Build Check
     runs-on: ubuntu-latest
@@ -30,8 +31,6 @@ jobs:
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
         run: npx vite build --mode production
         continue-on-error: true
-        # Note: build may warn about missing env vars — that is expected in CI.
-        # Fail only on actual compilation errors.
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -41,7 +40,7 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ── Job 2: Unit Tests ─────────────────────────────────────────────────────
+  # Job 2: Unit Tests
   unit-tests:
     name: Unit Tests (Vitest)
     runs-on: ubuntu-latest
@@ -69,7 +68,7 @@ jobs:
           path: test-results/
           retention-days: 7
 
-  # ── Job 3: Model Regression Test ─────────────────────────────────────────
+  # Job 3: Model Regression Test
   model-regression:
     name: Model Regression Test
     runs-on: ubuntu-latest
@@ -86,15 +85,15 @@ jobs:
         run: pip install onnxruntime numpy onnx
 
       - name: Run model regression test
-        # In CI: real model is not available (no Drive credentials).
-        # The script falls back to a generated stub fixture automatically.
-        # When DVC + service-account secret is configured, remove the comment
-        # below and add: dvc pull public/model/static.onnx
+        # In CI: static.onnx is not available (tracked by DVC, not in Git).
+        # The script detects this and uses the committed fixture + generates a stub ONNX.
+        # Threshold test is skipped; shape/load/finiteness tests still run.
+        # To enable the full accuracy test in CI: add dvc pull with a service-account secret.
         run: python scripts/model_regression_test.py
 
-  # ── Job 4: All green gate ────────────────────────────────────────────────
-  all-green:
-    name: All Checks Passed
+  # Job 4: CI Gate
+  ci-gate:
+    name: CI Gate
     needs: [build, unit-tests, model-regression]
     runs-on: ubuntu-latest
     if: always()
@@ -103,9 +102,9 @@ jobs:
         run: |
           if [[ "${{ needs.unit-tests.result }}" == "success" && \
                 "${{ needs.model-regression.result }}" == "success" ]]; then
-            echo "✅ All required CI checks passed!"
+            echo "All required CI checks passed."
           else
-            echo "❌ One or more required checks failed"
+            echo "One or more required checks failed."
             echo "  unit-tests:       ${{ needs.unit-tests.result }}"
             echo "  model-regression: ${{ needs.model-regression.result }}"
             echo "  build:            ${{ needs.build.result }}"
