@@ -1,0 +1,6 @@
+outs:
+- md5: 17cb8a8645138913182cd359d2227317.dir
+  size: 1252825
+  nfiles: 2
+  hash: md5
+  path: tfjs_model
