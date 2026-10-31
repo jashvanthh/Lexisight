@@ -30,7 +30,6 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
         run: npx vite build --mode production
-        continue-on-error: true
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -62,14 +61,6 @@ jobs:
         # downloads the latest version (currently v5, breaking API changes from v2).
         run: ./node_modules/.bin/vitest run --reporter=verbose
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results
-          path: test-results/
-          retention-days: 7
-
   # Job 3: Model Regression Test
   model-regression:
     name: Model Regression Test
@@ -84,13 +75,11 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python deps
-        run: pip install onnxruntime numpy onnx
+        run: pip install onnxruntime numpy
 
       - name: Run model regression test
-        # In CI: static.onnx is not available (tracked by DVC, not in Git).
-        # The script detects this and uses the committed fixture + generates a stub ONNX.
-        # Threshold test is skipped; shape/load/finiteness tests still run.
-        # To enable the full accuracy test in CI: add dvc pull with a service-account secret.
+        # Uses the real public/model/static.onnx (committed to Git) and the
+        # validation-split fixture in scripts/fixtures/. Fails if either is missing.
         run: python scripts/model_regression_test.py
 
   # Job 4: CI Gate
@@ -102,13 +91,14 @@ jobs:
     steps:
       - name: Check results
         run: |
-          if [[ "${{ needs.unit-tests.result }}" == "success" && \
+          if [[ "${{ needs.build.result }}" == "success" && \
+                "${{ needs.unit-tests.result }}" == "success" && \
                 "${{ needs.model-regression.result }}" == "success" ]]; then
             echo "All required CI checks passed."
           else
             echo "One or more required checks failed."
+            echo "  build:            ${{ needs.build.result }}"
             echo "  unit-tests:       ${{ needs.unit-tests.result }}"
             echo "  model-regression: ${{ needs.model-regression.result }}"
-            echo "  build:            ${{ needs.build.result }}"
             exit 1
           fi

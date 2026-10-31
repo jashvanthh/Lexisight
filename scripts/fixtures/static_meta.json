@@ -1,12 +1,8 @@
 {
-  "accuracy": 1.0,
-  "threshold": 0.85,
+  "source": "ml/data_processed/static/, val split (train_test_split test_size=0.2 random_state=42), 8 per class",
   "n_samples": 280,
   "n_classes": 35,
-  "input_dim": 126,
-  "output_dim": 35,
-  "sampling": "last-8-per-class (alphabetical), likely training data",
-  "paper_reported_val_accuracy": 0.939,
-  "note": "Model output idx = label_map key - 1 (0-indexed training, 1-indexed label map)",
-  "threshold_rationale": "Set to 85% (below paper val 93.9%) since fixture is from training data. Catches broken/replaced model only."
+  "measured_accuracy": 0.9357,
+  "threshold": 0.88,
+  "note": "CI safeguard only. Not an accuracy result; do not cite."
 }

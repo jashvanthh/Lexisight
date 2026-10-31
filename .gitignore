@@ -52,3 +52,6 @@ client_secret*.json
 # Lexisight Auxiliary Files
 TODO_REMAINING_CHANGES.md
 lexisight_silence_v11.html
+
+# CI fixture for the model regression test (small, must be in Git)
+!scripts/fixtures/*.npy
