@@ -1,0 +1,5 @@
+outs:
+- md5: 8dc73f1a1824625023e0dd853f18411a
+  size: 81378128
+  hash: md5
+  path: X_train.npy

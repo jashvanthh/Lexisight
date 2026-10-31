@@ -1,0 +1,5 @@
+outs:
+- md5: 295362a81b3734e2241a7b025e9234e1
+  size: 1125957
+  hash: md5
+  path: static.onnx

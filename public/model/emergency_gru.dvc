@@ -1,0 +1,6 @@
+outs:
+- md5: 8059247e4370ab4b7b7283466c85b2ab.dir
+  size: 225170
+  nfiles: 3
+  hash: md5
+  path: emergency_gru

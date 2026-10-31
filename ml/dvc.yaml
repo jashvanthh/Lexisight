@@ -1,30 +1,35 @@
 # ═══════════════════════════════════════════════════════════════
 # LexiSight — DVC Pipeline Definition
 # ═══════════════════════════════════════════════════════════════
-# Run: dvc repro
+# NOTE: This file lives in ml/ so all paths are relative to ml/
+# Run from repo root: dvc repro ml/dvc.yaml
 # This only re-runs stages whose inputs (code, data, params) changed.
 
 stages:
   train_temporal:
-    cmd: python ml/scripts/train_holistic.py --config ml/configs/train_temporal.yaml
+    cmd: python scripts/train_holistic.py --config configs/train_temporal.yaml
+    wdir: ..
     deps:
       - ml/configs/train_temporal.yaml
+      - ml/scripts/train_holistic.py
     params:
       - ml/params.yaml:
           - temporal
     outs:
       - ml/models/best_temporal.keras
     metrics:
-      - ml/eval/metrics.json:
+      - ml/eval/temporal_metrics.json:
           cache: false
 
   train_holistic_v3:
-    cmd: python ml/scripts/train_holistic.py --config ml/configs/train_holistic_v3.yaml --hard-neg-mining
+    cmd: python scripts/train_holistic.py --config configs/train_holistic_v3.yaml --hard-neg-mining
+    wdir: ml
     deps:
       - ml/configs/train_holistic_v3.yaml
+      - ml/scripts/train_holistic.py
     params:
       - ml/params.yaml:
           - holistic_v3
     metrics:
-      - ml/eval/metrics.json:
+      - ml/eval/holistic_v3_metrics.json:
           cache: false

@@ -1,0 +1,5 @@
+outs:
+- md5: 98106e8cb0ed1a53984d93e17d4042e5
+  size: 1134250
+  hash: md5
+  path: best_static_pt.pth

@@ -1,0 +1,5 @@
+outs:
+- md5: bfdfa2da86cb4137ce99b07f5ff4cc89
+  size: 3872164
+  hash: md5
+  path: temporal_best.keras

@@ -1,0 +1,6 @@
+outs:
+- md5: da0843947f1bf077e99cb4738943521f.dir
+  size: 629032
+  nfiles: 3
+  hash: md5
+  path: alphabet_gru

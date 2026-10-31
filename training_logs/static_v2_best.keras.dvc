@@ -1,0 +1,5 @@
+outs:
+- md5: 3e38da48b150ea7d4bbcf7f353e89d77
+  size: 791690
+  hash: md5
+  path: static_v2_best.keras

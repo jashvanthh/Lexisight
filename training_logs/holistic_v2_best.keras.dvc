@@ -1,0 +1,5 @@
+outs:
+- md5: b0ba953e5848c7f507930d67119c9df2
+  size: 12181930
+  hash: md5
+  path: holistic_v2_best.keras
