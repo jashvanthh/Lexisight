@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════
+# LexiSight — Confirmed Training Parameters (paper-v1)
+# ═══════════════════════════════════════════════════════════════
+# These values reflect the settings used to train the model that
+# produced the results in the IEEE paper (tag: paper-v1).
+# Only edit this file if you retrain with different settings.
+
+temporal:
+  # Architecture
+  input_frames: 30          # 1 second at 30 fps
+  features: 126             # 21 landmarks × 3 coords × 2 hands
+  d_model: 128              # projection dimension
+  heads: 4                  # attention heads
+  blocks: 2                 # transformer layers (holistic_v3 uses 3 — confirm before changing)
+  feedforward_dim: 256
+  dropout: 0.2
+  classifier_hidden: 64
+
+  # Training — Phase 1
+  optimizer: adamw
+  lr: 0.001
+  weight_decay: 0.01
+  batch_size: 64
+  epochs: 100
+  warmup_epochs: 5
+  label_smoothing: 0.1
+  early_stopping_patience: 20
+
+  # Training — Phase 2 (signer-disjoint fine-tune)
+  phase2_lr: 0.0001
+  phase2_epochs: 50
+  phase2_batch_size: 32
+
+  # Data
+  split_strategy: signer_disjoint
+  val_ratio: 0.15
+  seed: 42
+  num_classes: 263
+
+holistic_v3:
+  # Architecture (hard-negative mining variant)
+  input_dim: 126
+  num_classes: 263
+  hidden_dim: 256
+  heads: 8
+  blocks: 3
+  dropout: 0.30
+  l2_reg: 0.002
+
+  # Training
+  optimizer: adamw
+  lr: 0.001
+  batch_size: 32
+  epochs: 60
+  warmup_epochs: 3
+  label_smoothing: 0.05
+  focal_gamma: 1.5
+  seed: 42
