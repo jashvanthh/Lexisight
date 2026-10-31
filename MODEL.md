@@ -14,8 +14,8 @@
 |---|---|
 | **Task** | Recognise ISL words from 30-frame landmark sequences |
 | **Paper result** | **81.34% top-1 val accuracy** (263 classes, 80/20 stratified split) |
-| **Checkpoint file** | `holistic_v2_best.keras` |
-| **DVC pointer** | `training_logs/holistic_v2_best.keras.dvc` |
+| **Checkpoint file** | Not identified — see warning below |
+| **DVC pointer** | Not identified |
 | **Deployed as** | `public/model/tfjs_model/` (TF.js float16, 1.24 MB) |
 | **Classes** | 261 active out of 263 in label map |
 | **Architecture** | 2-block Multi-Head Attention Transformer |
@@ -24,11 +24,12 @@
 
 > [!WARNING]
 > **Discrepancy not yet resolved:** `DEPLOYED_CHECKPOINTS.md` records 93.57% for
-> `holistic_v2_best.keras`, but the paper reports 81.34%. These are likely from
-> different training runs or different val splits. The checkpoint that produced
-> 81.34% has **not yet been identified**. Until it is, do not claim in the paper
-> that `holistic_v2_best.keras` is the paper model. Write plainly that the exact
-> checkpoint is unconfirmed.
+> `holistic_v2_best.keras`, but the paper reports 81.34%. These numbers are from
+> different models or different splits. The **checkpoint that produced 81.34% has
+> not been identified**. The deployed file (`holistic_v2_best.keras`) is the best
+> available temporal model but its val accuracy (93.57%) does not match the paper.
+> Until the correct checkpoint is found, write "checkpoint not identified" in the paper
+> and do not link any file to the 81.34% result.
 
 ### Confirmed Training Settings (Temporal)
 
