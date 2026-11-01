@@ -3,14 +3,11 @@ import { defineConfig, devices } from '@playwright/test'
 /**
  * Playwright E2E smoke tests for LexiSight.
  *
- * These tests verify that the app boots, routes resolve, and the UI
- * renders without JavaScript crashes. They do NOT test gesture recognition
- * (that is covered by the model regression test in scripts/).
+ * In CI, Vite is started manually by the workflow (before npx playwright test)
+ * so that environment variables (Clerk key, Convex URL) are passed correctly.
+ * Playwright reuses that already-running server.
  *
- * The dev server is started automatically by Playwright's webServer option.
- * VITE_CLERK_PUBLISHABLE_KEY and VITE_CONVEX_URL are passed via CI secrets.
- * Stub fallbacks are provided so the app doesn't throw on startup if the
- * secrets are missing (e.g. fork PRs with no access to secrets).
+ * Locally, Playwright auto-starts Vite via webServer (reads .env automatically).
  */
 export default defineConfig({
   testDir: './e2e',
@@ -40,22 +37,12 @@ export default defineConfig({
     },
   ],
 
+  // In CI the workflow starts Vite before calling playwright test,
+  // so we always reuse the existing server. Locally, auto-start it.
   webServer: {
     command: 'npx vite --port 5174',
-    // Explicitly pass VITE_ env vars to the Vite subprocess.
-    // process.env here is evaluated at config-parse time in the Playwright
-    // Node process, which inherits the CI step environment (GitHub Secrets).
-    // Stub fallbacks prevent main.jsx from throwing when secrets are absent.
-    env: {
-      ...process.env,
-      VITE_CLERK_PUBLISHABLE_KEY:
-        process.env.VITE_CLERK_PUBLISHABLE_KEY ||
-        'pk_test_placeholder00000000000000000000000000000000',
-      VITE_CONVEX_URL:
-        process.env.VITE_CONVEX_URL || 'https://placeholder.convex.cloud',
-    },
     url: 'http://localhost:5174',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
