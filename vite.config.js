@@ -7,12 +7,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // FIX: disable SW in dev — it intercepts /room/:code routes and serves
+      // FIX: disable SW in dev -- it intercepts /room/:code routes and serves
       // stale cache, causing chrome-error://chromewebdata/ crashes
       devOptions: { enabled: false },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'LexiSight — ISL Translator',
+        name: 'LexiSight -- ISL Translator',
         short_name: 'LexiSight',
         description: '63 million Indians cannot be heard. LexiSight changes that.',
         theme_color: '#020408',
@@ -46,6 +46,18 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: 5174
+    port: 5174,
+    watch: {
+      // ml/ contains ~87,000 training files that exhaust the Linux inotify
+      // file-watcher limit on GitHub Actions runners, crashing Vite on startup.
+      // Exclude all large data directories that are not source files.
+      ignored: [
+        '**/ml/**',
+        '**/Datasets/**',
+        '**/Datasets_local/**',
+        '**/node_modules/**',
+        '**/.git/**'
+      ]
+    }
   }
 })

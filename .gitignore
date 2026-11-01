@@ -55,3 +55,9 @@ lexisight_silence_v11.html
 
 # CI fixture for the model regression test (small, must be in Git)
 !scripts/fixtures/*.npy
+
+# Playwright
+playwright-report/
+test-results/
+
+Lexisight/
