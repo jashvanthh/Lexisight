@@ -3,95 +3,84 @@ import { test, expect } from '@playwright/test'
 /**
  * LexiSight E2E smoke tests
  *
- * These tests verify the app boots and core pages are reachable.
- * They do NOT test gesture recognition -- that is the model regression test.
- *
  * What a green result guarantees:
  *   - Vite serves the app without crashing
- *   - The landing page HTML renders (React hydrates)
- *   - Navigation links to /translate are present
- *   - The /translate route resolves to a page (even if behind auth)
+ *   - The landing page HTML is delivered by the server
+ *   - React mounts into #root (page is not blank)
+ *   - The /translate route resolves without a server error
  *   - No uncaught JavaScript errors on the landing page
+ *     (Clerk/Convex warnings are ignored -- they use stub keys in CI)
  *
- * Strategy: use waitUntil:'domcontentloaded' so goto() returns once the HTML
- * is parsed. The default 'load' waits for Clerk + Convex network requests that
- * never settle on CI (no real backend), which causes 30-second timeouts.
+ * Strategy: use waitUntil:'domcontentloaded' so goto() returns as soon as
+ * the HTML is parsed. The default 'load' waits for Clerk/Convex network
+ * requests that never settle in CI, causing 60-second timeouts.
  */
 
+/** Errors from Clerk/Convex stub keys are expected in CI -- ignore them. */
+function isIgnorableError(msg) {
+  return (
+    msg.includes('Clerk') ||
+    msg.includes('clerkjs') ||
+    msg.includes('publishable') ||
+    msg.includes('Convex') ||
+    msg.includes('convex') ||
+    msg.includes('WebSocket') ||
+    msg.includes('placeholder')
+  )
+}
+
 test.describe('Landing page', () => {
-  test('loads without a JavaScript crash', async ({ page }) => {
+  test('serves HTML and mounts React', async ({ page }) => {
     const errors = []
-    // Ignore Clerk/Convex warnings -- expected in smoke test environment
     page.on('pageerror', err => {
-      const msg = err.message
-      if (
-        !msg.includes('Clerk') &&
-        !msg.includes('publishable') &&
-        !msg.includes('clerkjs') &&
-        !msg.includes('convex') &&
-        !msg.includes('Convex')
-      ) {
-        errors.push(msg)
-      }
+      if (!isIgnorableError(err.message)) errors.push(err.message)
     })
 
-    // domcontentloaded fires once HTML is parsed -- does not wait for
-    // Clerk CDN scripts or Convex WebSocket to settle
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    // domcontentloaded: returns as soon as HTML is parsed,
+    // before Clerk/Convex scripts finish loading
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-    // Wait for React to inject something into #root
+    // #root exists and React has injected something into it
     await expect(page.locator('#root')).not.toBeEmpty({ timeout: 30_000 })
 
-    // Title contains app name
-    await expect(page).toHaveTitle(/LexiSight/i, { timeout: 15_000 })
+    // Page title contains the app name (set in index.html <title>)
+    await expect(page).toHaveTitle(/LexiSight/i, { timeout: 10_000 })
 
-    // No unexpected crashes
-    expect(errors, `Unexpected JS errors: ${errors.join(', ')}`).toHaveLength(0)
+    expect(errors, `JS errors: ${errors.join(' | ')}`).toHaveLength(0)
   })
 
-  test('shows a visible heading', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+  test('shows a visible heading after React hydrates', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-    // Wait for React to hydrate -- heading appears after SplashScreen clears
+    // Wait up to 30s for React to render past the SplashScreen (800ms delay)
     const heading = page.locator('h1, h2').first()
     await expect(heading).toBeVisible({ timeout: 30_000 })
   })
 
   test('has a link to the translator', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-    // Wait for React to hydrate
+    // Must have a heading first (React is hydrated)
     await page.locator('h1, h2').first().waitFor({ state: 'visible', timeout: 30_000 })
 
-    // At least one anchor pointing at /translate (or /translator)
-    const translatorLink = page.locator('a[href*="translat"]').first()
-    await expect(translatorLink).toBeVisible({ timeout: 15_000 })
+    const link = page.locator('a[href*="translat"]').first()
+    await expect(link).toBeVisible({ timeout: 15_000 })
   })
 })
 
 test.describe('Translator route', () => {
-  test('resolves to a page (auth wall or translator UI)', async ({ page }) => {
+  test('resolves without a server error', async ({ page }) => {
     const errors = []
     page.on('pageerror', err => {
-      const msg = err.message
-      if (
-        !msg.includes('Clerk') &&
-        !msg.includes('publishable') &&
-        !msg.includes('clerkjs') &&
-        !msg.includes('convex') &&
-        !msg.includes('Convex')
-      ) {
-        errors.push(msg)
-      }
+      if (!isIgnorableError(err.message)) errors.push(err.message)
     })
 
     // Clerk may redirect to /sign-in -- that is fine, routing is working
-    await page.goto('/translate', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    await page.goto('/translate', { waitUntil: 'domcontentloaded' })
 
-    // Page must render something into #root (not a blank white screen or 404)
+    // Must render something into #root (not a blank screen or 404)
     await expect(page.locator('#root')).not.toBeEmpty({ timeout: 30_000 })
 
-    // No uncaught JS crashes (missing model files, bad imports, etc.)
-    expect(errors, `JS errors on /translate: ${errors.join(', ')}`).toHaveLength(0)
+    expect(errors, `JS errors on /translate: ${errors.join(' | ')}`).toHaveLength(0)
   })
 })
