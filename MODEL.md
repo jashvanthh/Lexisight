@@ -3,9 +3,9 @@
 > [!IMPORTANT]
 > LexiSight uses **two separate models** for different tasks.
 > The 81.34% figure in the paper is for the **temporal word model** (263 classes).
-> The 93.9% figure is for the **static fingerspelling model** (35 classes: digits 0-9 + letters A-Y).
+> The 93.9% figure is for the **static fingerspelling model** (35 classes: digits 1-9 + letters A-Z).
 > These are different models evaluated on different tasks. Do not mix them.
-> NOTE: The static model has 35 output classes. "Z" is not in the training set and cannot be predicted.
+> NOTE: The static model has 35 output classes. Digit 0 is not in the training set and cannot be predicted.
 
 ---
 
@@ -40,12 +40,16 @@
 | Input features | 126 (2 hands x 21 landmarks x 3 coords) | CONFIRMED |
 | Embedding dim (d_model) | 128 | CONFIRMED |
 | Attention heads | 4 | CONFIRMED |
-| Transformer layers | 2 (paper says 3 — not yet reconciled) | UNCONFIRMED |
-| Dropout | 0.30 attention, 0.40 head | CONFIRMED |
-| Optimizer | AdamW (weight decay 1e-4) | CONFIRMED |
-| Learning rate | 5e-4 | CONFIRMED |
-| Batch size | 32 | CONFIRMED |
-| Max epochs | 60 | CONFIRMED |
+| Transformer layers | 2 (paper says 3 -- not yet reconciled) | UNCONFIRMED |
+| Dropout | 0.20 | CONFIRMED |
+| Optimizer | AdamW (weight_decay=0.01) | CONFIRMED |
+| Learning rate | 0.001 (1e-3) | CONFIRMED |
+| Batch size | 64 | CONFIRMED |
+| Max epochs | 100 (early stop patience=20) | CONFIRMED |
+| Fine-tune lr | 0.0001 (phase 2) | CONFIRMED |
+| Fine-tune epochs | 50 (phase 2) | CONFIRMED |
+| Val split | 80/20 stratified random (seed=42) | CONFIRMED |
+| Num classes | 263 | CONFIRMED |
 
 ---
 
@@ -58,7 +62,7 @@
 | **Checkpoint file** | `phase2_best.keras` |
 | **DVC pointer** | `training_logs/phase2_best.keras.dvc` |
 | **Deployed as** | `public/model/static.onnx` (ONNX, 1.1 MB) + `public/model/static_tfjs_model/` |
-| **Classes** | 35 (digits 0-9 + letters A-Y; Z not in training set and cannot be predicted) |
+| **Classes** | 35 (digits 1-9 + letters A-Z; digit 0 not in training set) |
 | **Architecture** | 3 residual blocks, 256 hidden units, ReLU |
 
 ### Confirmed Training Settings (Static)
