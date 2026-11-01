@@ -3,8 +3,9 @@
 > [!IMPORTANT]
 > LexiSight uses **two separate models** for different tasks.
 > The 81.34% figure in the paper is for the **temporal word model** (263 classes).
-> The 93.9% figure is for the **static fingerspelling model** (36 classes).
+> The 93.9% figure is for the **static fingerspelling model** (35 classes: digits 1-9 + letters A-Z).
 > These are different models evaluated on different tasks. Do not mix them.
+> NOTE: The static model has 35 output classes. Digit 0 is not in the training set and cannot be predicted.
 
 ---
 
@@ -35,16 +36,27 @@
 
 | Setting | Value | Confirmed? |
 |---|---|---|
-| Sequence length | 30 frames | CONFIRMED |
-| Input features | 126 (2 hands x 21 landmarks x 3 coords) | CONFIRMED |
-| Embedding dim (d_model) | 128 | CONFIRMED |
-| Attention heads | 4 | CONFIRMED |
-| Transformer layers | 2 (paper says 3 — not yet reconciled) | UNCONFIRMED |
-| Dropout | 0.30 attention, 0.40 head | CONFIRMED |
-| Optimizer | AdamW (weight decay 1e-4) | CONFIRMED |
-| Learning rate | 5e-4 | CONFIRMED |
-| Batch size | 32 | CONFIRMED |
-| Max epochs | 60 | CONFIRMED |
+| Sequence length | 30 frames | CONFIRMED (config file) |
+| Input features | 126 (2 hands x 21 landmarks x 3 coords) | CONFIRMED (config file) |
+| Embedding dim (d_model) | 128 | CONFIRMED (config file) |
+| Attention heads | 4 | CONFIRMED (config file) |
+| Transformer layers | 2 | CONFIRMED (config file) -- paper Table III says 3, not reconciled |
+| Dropout | 0.20 | CONFIRMED (config file) -- paper Table III says 0.3, not reconciled |
+| Optimizer | AdamW | CONFIRMED (config file) |
+| Learning rate | 0.001 | CONFIRMED (config file) -- paper Table III says 5e-4, not reconciled |
+| Weight decay | 0.01 | UNCONFIRMED -- in config file but checkpoint not identified |
+| Batch size | 64 (phase 1), 32 (phase 2) | CONFIRMED (config file) |
+| Max epochs | 100 phase 1 + 50 phase 2 | CONFIRMED (config file) |
+| Early stop patience | 20 (phase 1), 15 (phase 2) | UNCONFIRMED -- in config file but checkpoint not identified |
+| Val split | 80/20 stratified random (seed=42) | CONFIRMED (params.yaml) |
+| Num classes | 263 | CONFIRMED (params.yaml) |
+
+> [!WARNING]
+> The checkpoint that produced 81.34% has not been identified. The values above come from
+> `ml/configs/train_temporal.yaml`, which is the config used with `train_holistic.py`.
+> Three values contradict paper Table III: layers (2 vs 3), dropout (0.20 vs 0.30),
+> lr (0.001 vs 5e-4). Until the exact checkpoint and its training log are found,
+> mark these three values as UNCONFIRMED in the paper and note the discrepancy.
 
 ---
 
@@ -52,12 +64,12 @@
 
 | Field | Value |
 |---|---|
-| **Task** | Recognise static ISL letters (A–Z) and digits (0–9) from a single frame |
-| **Paper result** | **93.9% top-1 val accuracy** (36 classes) |
+| **Task** | Recognise static ISL letters (A-Y) and digits (0-9) from a single frame |
+| **Paper result** | **93.9% top-1 val accuracy** (35 classes) |
 | **Checkpoint file** | `phase2_best.keras` |
 | **DVC pointer** | `training_logs/phase2_best.keras.dvc` |
 | **Deployed as** | `public/model/static.onnx` (ONNX, 1.1 MB) + `public/model/static_tfjs_model/` |
-| **Classes** | 36 (26 letters + 10 digits) |
+| **Classes** | 35 (digits 1-9 + letters A-Z; digit 0 not in training set) |
 | **Architecture** | 3 residual blocks, 256 hidden units, ReLU |
 
 ### Confirmed Training Settings (Static)
@@ -87,15 +99,17 @@
 ## CI Regression Test
 
 The CI model regression test covers **Model 2 (static.onnx)** only:
-- 280 samples (8 per class from `ml/data_processed/static/`)
-- Fixture samples are from the **training set** (model scores 100% on them)
-- **Threshold: 85%** — set below paper val accuracy (93.9%) so it is honest
-- The test purpose: detect a broken or accidentally replaced `static.onnx`, not measure val accuracy
 
-> [!WARNING]
-> Do not cite the fixture accuracy (100%) anywhere. It is a training-data artifact.
-> The correct val accuracy is **93.9%** from `DEPLOYED_CHECKPOINTS.md`.
-> To get an honest CI accuracy test, export a held-out val split from the training script.
+- **280 samples** (8 per class x 35 classes) from the **validation split** (not training data)
+- Fixture built with `train_test_split(test_size=0.2, stratify=y, random_state=42)` then 8 samples per class sampled with `rng(42)`
+- **Measured accuracy on fixture: 93.57%**
+- **Threshold: 88%** (5 percentage points below measured, to allow for sampling variance)
+- **Purpose: safety check only** -- detects a broken, corrupted, or accidentally replaced `static.onnx`
+
+> [!NOTE]
+> This is a CI safeguard, not a paper result. Do not cite 93.57% as the model's validation
+> accuracy -- the paper figure is 93.9% measured on the full held-out validation set.
+> The fixture is a small sample (280 of ~8,400 val samples) and exists only to catch regressions.
 
 ---
 
