@@ -1,14 +1,12 @@
-# ═══════════════════════════════════════════════════════════════
-# LexiSight — DVC Pipeline Definition
-# ═══════════════════════════════════════════════════════════════
-# NOTE: This file lives in ml/ so all paths are relative to ml/
+# LexiSight -- DVC Pipeline Definition
+# All paths are relative to the repo root (wdir: .. from ml/).
 # Run from repo root: dvc repro ml/dvc.yaml
-# This only re-runs stages whose inputs (code, data, params) changed.
+# DVC only re-runs stages whose inputs (code, data, params) changed.
 
 stages:
   train_temporal:
-    cmd: python scripts/train_holistic.py --config configs/train_temporal.yaml
-    wdir: ..
+    cmd: python ml/scripts/train_holistic.py --config ml/configs/train_temporal.yaml
+    wdir: .
     deps:
       - ml/configs/train_temporal.yaml
       - ml/scripts/train_holistic.py
@@ -22,8 +20,8 @@ stages:
           cache: false
 
   train_holistic_v3:
-    cmd: python scripts/train_holistic.py --config configs/train_holistic_v3.yaml --hard-neg-mining
-    wdir: ml
+    cmd: python ml/scripts/train_holistic.py --config ml/configs/train_holistic_v3.yaml --hard-neg-mining
+    wdir: .
     deps:
       - ml/configs/train_holistic_v3.yaml
       - ml/scripts/train_holistic.py
