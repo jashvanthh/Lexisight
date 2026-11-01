@@ -36,20 +36,27 @@
 
 | Setting | Value | Confirmed? |
 |---|---|---|
-| Sequence length | 30 frames | CONFIRMED |
-| Input features | 126 (2 hands x 21 landmarks x 3 coords) | CONFIRMED |
-| Embedding dim (d_model) | 128 | CONFIRMED |
-| Attention heads | 4 | CONFIRMED |
-| Transformer layers | 2 (paper says 3 -- not yet reconciled) | UNCONFIRMED |
-| Dropout | 0.20 | CONFIRMED |
-| Optimizer | AdamW (weight_decay=0.01) | CONFIRMED |
-| Learning rate | 0.001 (1e-3) | CONFIRMED |
-| Batch size | 64 | CONFIRMED |
-| Max epochs | 100 (early stop patience=20) | CONFIRMED |
-| Fine-tune lr | 0.0001 (phase 2) | CONFIRMED |
-| Fine-tune epochs | 50 (phase 2) | CONFIRMED |
-| Val split | 80/20 stratified random (seed=42) | CONFIRMED |
-| Num classes | 263 | CONFIRMED |
+| Sequence length | 30 frames | CONFIRMED (config file) |
+| Input features | 126 (2 hands x 21 landmarks x 3 coords) | CONFIRMED (config file) |
+| Embedding dim (d_model) | 128 | CONFIRMED (config file) |
+| Attention heads | 4 | CONFIRMED (config file) |
+| Transformer layers | 2 | CONFIRMED (config file) -- paper Table III says 3, not reconciled |
+| Dropout | 0.20 | CONFIRMED (config file) -- paper Table III says 0.3, not reconciled |
+| Optimizer | AdamW | CONFIRMED (config file) |
+| Learning rate | 0.001 | CONFIRMED (config file) -- paper Table III says 5e-4, not reconciled |
+| Weight decay | 0.01 | UNCONFIRMED -- in config file but checkpoint not identified |
+| Batch size | 64 (phase 1), 32 (phase 2) | CONFIRMED (config file) |
+| Max epochs | 100 phase 1 + 50 phase 2 | CONFIRMED (config file) |
+| Early stop patience | 20 (phase 1), 15 (phase 2) | UNCONFIRMED -- in config file but checkpoint not identified |
+| Val split | 80/20 stratified random (seed=42) | CONFIRMED (params.yaml) |
+| Num classes | 263 | CONFIRMED (params.yaml) |
+
+> [!WARNING]
+> The checkpoint that produced 81.34% has not been identified. The values above come from
+> `ml/configs/train_temporal.yaml`, which is the config used with `train_holistic.py`.
+> Three values contradict paper Table III: layers (2 vs 3), dropout (0.20 vs 0.30),
+> lr (0.001 vs 5e-4). Until the exact checkpoint and its training log are found,
+> mark these three values as UNCONFIRMED in the paper and note the discrepancy.
 
 ---
 
