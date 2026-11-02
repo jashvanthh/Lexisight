@@ -1,0 +1,37 @@
+schema: '2.0'
+stages:
+  train_experiment:
+    cmd: .\ml\venv\Scripts\python.exe ml/scripts/train_experiment.py
+    deps:
+    - path: ml/scripts/train_experiment.py
+      hash: md5
+      md5: 3b8c22a61a56752294d33c891c3533bf
+      size: 4083
+    - path: scripts/fixtures/static_X.npy
+      hash: md5
+      md5: 089f9ca65b45313a8f80e635b11720fa
+      size: 141248
+    - path: scripts/fixtures/static_y.npy
+      hash: md5
+      md5: 540ccc499630a36542f8bdf560e3ef45
+      size: 2368
+    params:
+      ml/params.yaml:
+        experiment:
+          architecture: dense_resnet
+          input_dim: 126
+          num_classes: 35
+          hidden_units: 256
+          dropout: 0.2
+          lr: 0.002
+          batch_size: 16
+          epochs: 35
+    outs:
+    - path: ml/eval/experiment_metrics.json
+      hash: md5
+      md5: f2630b5db4862e6a63a10be472c348f4
+      size: 101
+    - path: ml/models/experiment_model.keras
+      hash: md5
+      md5: 2df90efae261b90f7db1bfcfd77e6dff
+      size: 896449
